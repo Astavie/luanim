@@ -1,0 +1,9 @@
+*
+!/**/
+!*.*
+!Makefile
+
+ols.json
+build/**/*.*
+!build/wasm/index.html
+.vscode/

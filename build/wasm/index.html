@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Onimate</title>
+</head>
+<body>
+    <script type="module">
+        import Module from "./onimate.js"
+        Module({
+            print: text => { console.log(text) }
+        }).then(onimate => {
+            onimate.__start()
+            onimate.__end()
+        })
+    </script>
+</body>
+</html>
