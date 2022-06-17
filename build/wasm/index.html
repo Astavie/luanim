@@ -7,10 +7,14 @@
     <title>Onimate</title>
 </head>
 <body>
+    <p id="stdout"></p>
     <script type="module">
         import Module from "./onimate.js"
+
+        const stdout = document.getElementById("stdout")
+
         Module({
-            print: text => { console.log(text) }
+            print: text => { stdout.innerText += text + "\n" }
         }).then(onimate => {
             onimate.__start()
             onimate.__end()
