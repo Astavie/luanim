@@ -36,7 +36,10 @@ desktop: ${SOURCE}
 	${ODIN} build . ${OPT_ODIN_DESKTOP} -out:./onimate_full
 
 clean:
-	rm -rf ${BUILDDIR}
+	rm -rf ${OBJDIR}
+	rm ${WASMDIR}/onimate.data
+	rm ${WASMDIR}/onimate.js
+	rm ${WASMDIR}/onimate.wasm
 	rm ./onimate_full
 
 .PHONY: all wasm desktop clean
