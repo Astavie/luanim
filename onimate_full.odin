@@ -4,6 +4,9 @@ import "core"
 import "core/io"
 import "core/lua"
 
+TEST_LIB :: []lua.Reg {
+}
+
 main :: proc() {
     state := lua.newstate()
 
@@ -13,6 +16,8 @@ main :: proc() {
     }
 
     lua.openlibs(state)
+    lua.openlib(state, "test", TEST_LIB, false)
+    
     ret := lua.dofile(state, "hellope.lua")
 
     if (ret != 0) {

@@ -3,7 +3,7 @@ package onimate_core
 
 import "core:runtime"
 import "core:intrinsics"
-    
+
 @export
 _start :: proc "c" () {
     context = runtime.default_context()
