@@ -8,7 +8,7 @@
 ---@field tween?   tween
 
 ---@class Scene
----@field         time      seconds
+---@field package time      seconds
 ---@field package refs      table<id, Ref>
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
@@ -20,6 +20,12 @@ local Scene = {}
 ---@param time seconds
 function Scene.wait(self, time)
   coroutine.yield({ start = self.time, duration = time })
+end
+
+---@param self Scene
+---@return seconds
+function Scene.clock(self)
+  return self.time
 end
 
 ---@param self Scene
