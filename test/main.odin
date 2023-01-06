@@ -17,11 +17,6 @@ open_test :: proc "c" (state: ^lua.State) -> lua.int {
     return 1
 }
 
-open_tweens :: proc "c" (state: ^lua.State) -> lua.int {
-    lua.dostring(state, #load("../lib/onimate_lua/tweens.lua"))
-    return 1
-}
-
 main :: proc() {
     state := lua.newstate()
     lua.checkversion(state)
@@ -34,7 +29,6 @@ main :: proc() {
     lua.openlibs(state)
     core.open_onimate_libs(state)
     lua.openlib(state, "test", open_test, false)
-    lua.openlib(state, "tweens", open_tweens, false)
 
     ret := lua.dostring(state, #load("hellope.lua"))
 
