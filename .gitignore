@@ -7,3 +7,6 @@ ols.json
 build/**/*.*
 !build/wasm/index.html
 .vscode/
+.emcache/
+
+*.o
