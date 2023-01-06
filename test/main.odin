@@ -21,6 +21,7 @@ open_test :: proc "c" (state: ^lua.State) -> c.int {
 
 main :: proc() {
     state := lua.newstate()
+    lua.checkversion(state)
 
     if state == nil {
         io.print("cannot start lua state")

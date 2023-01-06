@@ -2,8 +2,8 @@ SOURCE = ./test ./core
 ODIN = odin
 
 BUILDDIR = ./build
-INCLUDEDIR = ./include
-LUADIR = ./lib/lua
+LIBDIR = ./lib
+LUADIR = ${LIBDIR}/lua
 OBJDIR = ${BUILDDIR}/obj
 WASMDIR = ${BUILDDIR}/wasm
 
@@ -28,8 +28,8 @@ wasm: ${SOURCE} ${LUADIR}/liblua.a
 	mkdir -p ${OBJDIR}
 	mkdir -p ${WASMDIR}
 	${ODIN} build ./test -target:freestanding_wasm32 ${OPT_ODIN_WASM} -build-mode:obj -out:${OBJDIR}/onimate
-	emcc ${OBJDIR}/onimate.wasm.o ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/onimate.js --preload-file ./test/hellope.lua --js-library ${INCLUDEDIR}/odin.js -sEXPORTED_FUNCTIONS="['__start','__end']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
-	cp ${INCLUDEDIR}/index.html ${WASMDIR}
+	emcc ${OBJDIR}/onimate.wasm.o ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/onimate.js --preload-file ./test/hellope.lua --js-library ${LIBDIR}/odin.js -sEXPORTED_FUNCTIONS="['__start','__end']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
+	cp ./test/index.html ${WASMDIR}
 
 desktop: ${SOURCE}
 	${ODIN} build ./test ${OPT_ODIN_DESKTOP} -out:./onimate
