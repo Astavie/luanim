@@ -6,19 +6,22 @@ import "core:c"
 @(link_prefix = "luaL_")
 foreign {
     newstate :: proc() -> ^State ---
-    openlibs :: proc(state: ^State) ---
-    loadfilex :: proc(state: ^State, filename: cstring, mode: cstring) -> c.int ---
-    requiref :: proc(state: ^State, modname: cstring, openf: CFunction, glb: c.int) ---
-    checkversion_ :: proc(state: ^State, ver: Number, sz: c.size_t) ---
-    setfuncs :: proc(state: ^State, l: [^]Reg, nup: c.int) ---
+    openlibs :: proc(L: ^State) ---
+    loadfilex :: proc(L: ^State, filename: cstring, mode: cstring) -> int ---
+    requiref :: proc(L: ^State, modname: cstring, openf: CFunction, glb: int) ---
+    checkversion_ :: proc(L: ^State, ver: Number, sz: c.size_t) ---
+    setfuncs :: proc(L: ^State, l: [^]Reg, nup: int) ---
+    loadstring :: proc(L: ^State, s: cstring) -> int ---
 }
 
 @(link_prefix = "lua_")
 foreign {
-    pcallk :: proc(state: ^State, nargs: c.int, nresults: c.int, errfunc: c.int, ctx: KContext, k: KFunction) -> c.int ---
-    tolstring :: proc(state: ^State, idx: c.int, len: ^c.size_t) -> cstring ---
-    close :: proc(state: ^State) ---
-    settop :: proc(state: ^State, idx: c.int) ---
-    createtable :: proc(state: ^State, narray: c.int, nrec: c.int) ---
-    pushnumber :: proc(state: ^State, n: Number) ---
+    pcallk :: proc(L: ^State, nargs: int, nresults: int, errfunc: int, ctx: KContext, k: KFunction) -> int ---
+    tolstring :: proc(L: ^State, idx: int, len: ^c.size_t) -> cstring ---
+    close :: proc(L: ^State) ---
+    settop :: proc(L: ^State, idx: int) ---
+    createtable :: proc(L: ^State, narray: int, nrec: int) ---
+    pushnumber :: proc(L: ^State, n: Number) ---
+    pushcclosure :: proc(L: ^State, fn: CFunction, n: int) ---
+    gettop :: proc(L: ^State) -> c.int ---
 }

@@ -1,12 +1,12 @@
 local onimate = require 'onimate'
 local shapes  = require 'shapes'
-local interp  = require 'interp'
+local tweens  = require 'tweens'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
   while true do
-    scene:play(object:size(0), 0.5, interp.lerp)
-    scene:play(object:size(1), 0.5, interp.lerp)
+    scene:play(object:size(0), 0.5, tweens.lerp)
+    scene:play(object:size(1), 0.5, tweens.lerp)
   end
 end
 
@@ -17,7 +17,7 @@ local function scene1(scene)
 
   local square = scene:add(shapes.square)
   scene:play(square:x(-10)) -- 'square:value().x = 10' should also work
-  scene:play(square:x( 10), 1, interp.lerp)
+  scene:play(square:x( 10), 1, tweens.lerp)
 
   -- grow and shrink square indefinitely
   local co = scene:parallel(flash, square)
@@ -34,10 +34,14 @@ local function scene1(scene)
     square:value().y = math.sin(p * 2 * math.pi) * 10
   end
 
-  scene:play(circle, 5, interp.lerp)
+  scene:play(circle, 5, tweens.lerp)
 
   -- make sure to terminate execution of infinite scenes
-  co:terminate()
+  scene:terminate(co)
 end
 
 onimate(scene1)
+
+-- potential export targets:
+-- * html canvas
+-- * lottie animation (this might be the easiest to implement first)

@@ -28,7 +28,7 @@ wasm: ${SOURCE} ${LUADIR}/liblua.a
 	mkdir -p ${OBJDIR}
 	mkdir -p ${WASMDIR}
 	${ODIN} build ./test -target:freestanding_wasm32 ${OPT_ODIN_WASM} -build-mode:obj -out:${OBJDIR}/onimate
-	emcc ${OBJDIR}/onimate.wasm.o ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/onimate.js --preload-file ./test/hellope.lua --js-library ${LIBDIR}/odin.js -sEXPORTED_FUNCTIONS="['__start','__end']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
+	emcc ${OBJDIR}/onimate.wasm.o ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/onimate.js --js-library ${LIBDIR}/odin.js -sEXPORTED_FUNCTIONS="['__start','__end']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
 	cp ./test/index.html ${WASMDIR}
 
 desktop: ${SOURCE}

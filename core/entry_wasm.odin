@@ -1,5 +1,5 @@
 //+build wasm32, wasm64
-package onimate_core
+package onimate
 
 import "core:runtime"
 import "core:intrinsics"

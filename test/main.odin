@@ -4,18 +4,21 @@ import "../core"
 import "../core/io"
 import "../core/lua"
 
-import "core:c"
-
 TEST_LIB :: []lua.Reg {
-    { "mol", proc "c" (state: ^lua.State) -> c.int {
+    { "mol", proc "c" (state: ^lua.State) -> lua.int {
         lua.pushnumber(state, 42)
         return 1
     } },
     { nil, nil },
 }
 
-open_test :: proc "c" (state: ^lua.State) -> c.int {
+open_test :: proc "c" (state: ^lua.State) -> lua.int {
     lua.newlib(state, TEST_LIB)
+    return 1
+}
+
+open_tweens :: proc "c" (state: ^lua.State) -> lua.int {
+    lua.dostring(state, #load("../lib/onimate_lua/tweens.lua"))
     return 1
 }
 
@@ -29,9 +32,11 @@ main :: proc() {
     }
 
     lua.openlibs(state)
+    core.open_onimate_libs(state)
     lua.openlib(state, "test", open_test, false)
-    
-    ret := lua.dofile(state, "test/hellope.lua")
+    lua.openlib(state, "tweens", open_tweens, false)
+
+    ret := lua.dostring(state, #load("hellope.lua"))
 
     if (ret != 0) {
         io.print(lua.tostring(state, -1))
