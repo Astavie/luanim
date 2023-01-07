@@ -44,4 +44,3 @@ onimate(scene1)
 
 -- potential export targets:
 -- * html canvas
--- * lottie animation (this might be the easiest to implement first)

@@ -27,7 +27,7 @@
       };
       onimate_wasm = final.stdenv.mkDerivation {
         name = "onimate-wasm";
-	buildInputs = [ odin final.emscripten ];
+	buildInputs = [ final.emscripten ];
 	configurePhase = ''
 	  export EM_CACHE=$(pwd)/.emcache
 	'';
@@ -35,8 +35,8 @@
 	  make wasm
 	'';
 	installPhase = ''
-	  mkdir -p $out/lib
-          cp -r build/wasm $out/lib
+	  mkdir -p $out/
+          cp build/wasm/* $out/
 	'';
 	src = ./.;
       };

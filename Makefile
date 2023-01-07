@@ -1,9 +1,8 @@
-SOURCE = ./test ./core
+SOURCE = ./test ./backend/odin ./src
 ODIN = odin
 
 BUILDDIR = ./build
-LIBDIR = ./lib
-LUADIR = ${LIBDIR}/lua
+LUADIR = ./lua
 OBJDIR = ${BUILDDIR}/obj
 WASMDIR = ${BUILDDIR}/wasm
 
@@ -11,12 +10,10 @@ BUILD = release
 
 ifeq (${BUILD},release)
     OPT_EMCC=-Os -flto -sEVAL_CTORS=2
-    OPT_ODIN_WASM=-o:size
-    OPT_ODIN_DESKTOP=-o:speed
+    OPT_ODIN=-o:speed
 else
     OPT_EMCC=-O1
-    OPT_ODIN_WASM=-o:minimal
-    OPT_ODIN_DESKTOP=-o:minimal
+    OPT_ODIN=-o:minimal
 endif
 
 all: wasm desktop
@@ -27,12 +24,15 @@ ${LUADIR}/liblua.a:
 wasm: ${SOURCE} ${LUADIR}/liblua.a
 	mkdir -p ${OBJDIR}
 	mkdir -p ${WASMDIR}
-	${ODIN} build ./test -target:freestanding_wasm32 ${OPT_ODIN_WASM} -build-mode:obj -out:${OBJDIR}/onimate
-	emcc ${OBJDIR}/onimate.wasm.o ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/onimate.js --js-library ${LIBDIR}/odin.js -sEXPORTED_FUNCTIONS="['__start','__end']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
+	emcc ${LUADIR}/liblua.a ${OPT_EMCC} -o ${WASMDIR}/lua.js -sEXPORTED_FUNCTIONS="['_luaL_newstate','_luaL_openlibs','_luaL_loadstring','_lua_pcallk','_luaL_requiref','_lua_settop','_lua_close','_lua_tolstring']" -sEXPORTED_RUNTIME_METHODS="['allocateUTF8','addFunction','UTF8ToString']" -sALLOW_TABLE_GROWTH -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
 	cp ./test/index.html ${WASMDIR}
+	cp ./test/hellope.lua ${WASMDIR}
+	cp ./backend/wasm/onimate.js ${WASMDIR}
+	cp ./src/core/onimate.lua ${WASMDIR}
+	cp ./src/core/tweens.lua ${WASMDIR}
 
 desktop: ${SOURCE}
-	${ODIN} build ./test ${OPT_ODIN_DESKTOP} -out:./onimate
+	${ODIN} build ./test ${OPT_ODIN} -out:./onimate
 
 clean:
 	rm -rf ${BUILDDIR}

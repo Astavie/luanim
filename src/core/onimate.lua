@@ -56,9 +56,9 @@ end
 ---@alias id integer
 
 ---@param self Scene
----@param coscene id
-function Scene.terminate(self, coscene)
-  table.insert(self.to_remove, coscene)
+---@param id id
+function Scene.terminate(self, id)
+  table.insert(self.to_remove, id)
 end
 
 ---@param self Scene
@@ -150,7 +150,7 @@ local function advance_frame(scene, fps, prev_frame)
     ::loop_end::
   end
 
-  -- remove finished coscenes
+  -- remove finished coroutines
   for _, id in ipairs(scene.to_remove) do
     if not scene.threads[id] == nil then
       coroutine.close(scene.threads[id])

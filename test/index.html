@@ -9,16 +9,27 @@
 <body>
     <p id="stdout"></p>
     <script type="module">
-        import Module from "./onimate.js"
+        import onimate from "./onimate.js"
 
-        const stdout = document.getElementById("stdout")
+        async function main() {
+            const stdout = document.getElementById("stdout")
+            const print = text => { stdout.innerText += text + "\n" }
 
-        Module({
-            print: text => { stdout.innerText += text + "\n" }
-        }).then(onimate => {
-            onimate.__start()
-            onimate.__end()
-        })
+            const instance = await onimate(print)
+            if (!instance) {
+                print("could not start onimate")
+                return
+            }
+
+            const ret = await instance.run("hellope.lua")
+            if (ret != 0) {
+                print(instance.peekstring())
+            }
+
+            instance.close()
+        }
+
+        main()
     </script>
 </body>
 </html>

@@ -1,6 +1,5 @@
-local lib = require 'test'
 local tweens = require 'tweens'
-print("Hellope! " .. tweens.lerp(lib.mol()))
+print("Hellope! " .. tweens.lerp(42))
 
 local onimate = require 'onimate'
 

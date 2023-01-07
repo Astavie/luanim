@@ -1,8 +1,8 @@
 package main
 
-import "../core"
-import "../core/io"
-import "../core/lua"
+import core "../backend/odin"
+import      "../backend/odin/io"
+import      "../backend/odin/lua"
 
 TEST_LIB :: []lua.Reg {
     { "mol", proc "c" (state: ^lua.State) -> lua.int {
