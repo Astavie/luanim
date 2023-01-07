@@ -1,9 +1,9 @@
 local tweens = require 'tweens'
 print("Hellope! " .. tweens.lerp(42))
 
-local onimate = require 'onimate'
+local luanim = require 'luanim'
 
-onimate(function (scene)
+luanim(function (scene)
 
   scene:parallel(function (scene)
     scene:wait(0.1)

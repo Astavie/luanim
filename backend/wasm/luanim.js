@@ -1,6 +1,6 @@
 import factory from "./lua.js"
 
-class Onimate {
+class Luanim {
     constructor(lua, L) {
         this.lua = lua
         this.L = L
@@ -19,7 +19,7 @@ class Onimate {
     }
 }
 
-export default async function load_onimate(print, lib_dir = "") {
+export default async function load_luanim(print, lib_dir = "") {
     const lua = await factory({ print })
 
     const L = lua._luaL_newstate()
@@ -45,9 +45,9 @@ export default async function load_onimate(print, lib_dir = "") {
     }
 
     await Promise.all([
-        openlib("onimate", lib_dir + "onimate.lua"),
+        openlib("luanim", lib_dir + "luanim.lua"),
         openlib("tweens", lib_dir + "tweens.lua"),
     ])
 
-    return new Onimate(lua, L)
+    return new Luanim(lua, L)
 }

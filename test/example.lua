@@ -1,6 +1,6 @@
-local onimate = require 'onimate'
-local shapes  = require 'shapes'
-local tweens  = require 'tweens'
+local luanim = require 'luanim'
+local shapes = require 'shapes'
+local tweens = require 'tweens'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
@@ -40,7 +40,7 @@ local function scene1(scene)
   scene:terminate(co)
 end
 
-onimate(scene1)
+luanim(scene1)
 
 -- potential export targets:
 -- * html canvas

@@ -1,8 +1,9 @@
 package main
 
 import core "../backend/odin"
-import      "../backend/odin/io"
 import      "../backend/odin/lua"
+
+import "core:fmt"
 
 TEST_LIB :: []lua.Reg {
     { "mol", proc "c" (state: ^lua.State) -> lua.int {
@@ -22,18 +23,18 @@ main :: proc() {
     lua.checkversion(state)
 
     if state == nil {
-        io.print("cannot start lua state")
+        fmt.println("cannot start lua state")
         return
     }
 
     lua.openlibs(state)
-    core.open_onimate_libs(state)
+    core.open_luanim_libs(state)
     lua.openlib(state, "test", open_test, false)
 
     ret := lua.dostring(state, #load("hellope.lua"))
 
     if (ret != 0) {
-        io.print(lua.tostring(state, -1))
+        fmt.println(lua.tostring(state, -1))
     }
 
     lua.close(state)

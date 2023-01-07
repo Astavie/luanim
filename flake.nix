@@ -13,20 +13,20 @@
     overlays.default = final: prev: let
       odin = (astapkgs.overlays.default final prev).odin;
     in {
-      onimate_desktop = final.stdenv.mkDerivation {
-        name = "onimate-desktop";
+      luanim_desktop = final.stdenv.mkDerivation {
+        name = "luanim-desktop";
 	buildInputs = [ odin final.lua5_4 ];
         buildPhase = ''
 	  make desktop
 	'';
 	installPhase = ''
 	  mkdir -p $out/bin
-          cp onimate $out/bin/onimate-desktop
+          cp luanim $out/bin/luanim-desktop
 	'';
 	src = ./.;
       };
-      onimate_wasm = final.stdenv.mkDerivation {
-        name = "onimate-wasm";
+      luanim_wasm = final.stdenv.mkDerivation {
+        name = "luanim-wasm";
 	buildInputs = [ final.emscripten ];
 	configurePhase = ''
 	  export EM_CACHE=$(pwd)/.emcache
@@ -42,8 +42,8 @@
       };
     };
     packages.x86_64-linux = rec {
-      inherit (pkgs) onimate_desktop onimate_wasm;
-      default = onimate_desktop;
+      inherit (pkgs) luanim_desktop luanim_wasm;
+      default = luanim_desktop;
     };
   };
 }

@@ -164,7 +164,7 @@ local function advance_frame(scene, fps, prev_frame)
 end
 
 ---@param ... fun(scene: Scene)
-local function onimate(...)
+local function luanim(...)
   for _, func in ipairs({...}) do
     local scene = create_scene(func)
     local frame = 0
@@ -172,4 +172,4 @@ local function onimate(...)
   end
 end
 
-return onimate
+return luanim
