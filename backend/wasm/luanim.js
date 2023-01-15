@@ -45,7 +45,8 @@ export default async function load_luanim(print, lib_dir = "") {
     }
 
     await Promise.all([
-        openlib("luanim", lib_dir + "luanim.lua"),
+        openlib("luanim", lib_dir + "luanim.lua")
+            .then(() => openlib("shapes", lib_dir + "shapes.lua")),
         openlib("tweens", lib_dir + "tweens.lua"),
     ])
 

@@ -31,7 +31,7 @@ main :: proc() {
     core.open_luanim_libs(state)
     lua.openlib(state, "test", open_test, false)
 
-    ret := lua.dostring(state, #load("hellope.lua"))
+    ret := lua.dostring(state, #load("example.lua"))
 
     if (ret != 0) {
         fmt.println(lua.tostring(state, -1))

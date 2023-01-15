@@ -13,7 +13,12 @@
 
         async function main() {
             const stdout = document.getElementById("stdout")
-            const print = text => { stdout.innerText += text + "\n" }
+            const start = Date.now()
+            const print = text => {
+                const now = Date.now()
+                const diff = (now - start) / 1000
+                stdout.innerText += `[${diff}] ${text}\n`
+            }
 
             const instance = await luanim(print)
             if (!instance) {
@@ -21,7 +26,7 @@
                 return
             }
 
-            const ret = await instance.run("hellope.lua")
+            const ret = await instance.run("example.lua")
             if (ret != 0) {
                 print(instance.peekstring())
             }

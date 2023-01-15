@@ -1,5 +1,4 @@
----@class Ref
----@field package id id
+local luanim = {}
 
 ---@class Instruction
 ---@field start    seconds
@@ -9,22 +8,22 @@
 
 ---@class Scene
 ---@field package time      seconds
----@field package refs      table<id, Ref>
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
 ---@field package to_remove id[]
 ---@field package nextid    integer
-local Scene = {}
+luanim.Scene = {}
+luanim.Scene.__index = luanim.Scene;
 
 ---@param self Scene
 ---@param time seconds
-function Scene.wait(self, time)
+function luanim.Scene:wait(time)
   coroutine.yield({ start = self.time, duration = time })
 end
 
 ---@param self Scene
 ---@return seconds
-function Scene.clock(self)
+function luanim.Scene:clock()
   return self.time
 end
 
@@ -32,32 +31,16 @@ end
 ---@param anim animation
 ---@param time? seconds
 ---@param tween? tween
-function Scene.play(self, anim, time, tween)
+function luanim.Scene:play(anim, time, tween)
   if time == nil then time = 0 end
   coroutine.yield({ start = self.time, duration = time, anim = anim, tween = tween })
-end
-
----@generic T: Ref
----@param self Scene
----@param shaperef `T`
----@return T
-function Scene.add(self, shaperef)
-  ---@diagnostic disable-next-line: undefined-field
-  self.refs[shaperef.id] = shaperef
-  return shaperef
-end
-
----@param self Scene
----@param shaperef Ref
-function Scene.remove(self, shaperef)
-  self.refs[shaperef.id] = nil
 end
 
 ---@alias id integer
 
 ---@param self Scene
 ---@param id id
-function Scene.terminate(self, id)
+function luanim.Scene:terminate(id)
   table.insert(self.to_remove, id)
 end
 
@@ -65,28 +48,28 @@ end
 ---@param func fun(scene: Scene, ...: any)
 ---@param ... any
 ---@return id
-function Scene.parallel(self, func, ...)
+function luanim.Scene:parallel(func, ...)
   local id = self.nextid
   self.nextid = self.nextid + 1
 
   self.threads[id] = coroutine.create(func);
 
-  local alive
-  alive, self.queued[id] = coroutine.resume(self.threads[id], self, ...)
-
-  if not alive then self:terminate(id) end
+  local alive, co = coroutine.resume(self.threads[id], self, ...)
+  if alive and co ~= nil then
+    self.queued[id] = co
+  else
+    self:terminate(id)
+  end
 
   return id
 end
 
 ---@return Scene
----@param func fun(scene: Scene)
 ---@nodiscard
-local function create_scene(func)
+function luanim.Scene.new()
   ---@type Scene
   local scene = { time = 0, refs = {}, threads = {}, queued = {}, to_remove = {}, nextid = 0 }
-  setmetatable(scene, { __index = Scene })
-  scene:parallel(func)
+  setmetatable(scene, luanim.Scene)
   return scene
 end
 
@@ -104,7 +87,7 @@ end
 ---@param scene Scene
 ---@param fps   number
 ---@return boolean
-local function advance_frame(scene, fps, prev_frame)
+function luanim.advance_frame(scene, fps, prev_frame)
   local frame_time = 1 / fps
   local time = prev_frame * frame_time
   local next = (prev_frame + 1) * frame_time
@@ -152,7 +135,7 @@ local function advance_frame(scene, fps, prev_frame)
 
   -- remove finished coroutines
   for _, id in ipairs(scene.to_remove) do
-    if not scene.threads[id] == nil then
+    if scene.threads[id] ~= nil then
       coroutine.close(scene.threads[id])
     end
     scene.threads[id] = nil
@@ -164,11 +147,12 @@ local function advance_frame(scene, fps, prev_frame)
 end
 
 ---@param ... fun(scene: Scene)
-local function luanim(...)
+function luanim.run(...)
   for _, func in ipairs({...}) do
-    local scene = create_scene(func)
+    local scene = luanim.Scene.new()
+    scene:parallel(func)
     local frame = 0
-    while advance_frame(scene, 60, frame) do frame = frame + 1 end
+    while luanim.advance_frame(scene, 60, frame) do frame = frame + 1 end
   end
 end
 
