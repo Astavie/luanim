@@ -15,30 +15,30 @@
     in {
       luanim_desktop = final.stdenv.mkDerivation {
         name = "luanim-desktop";
-	buildInputs = [ odin final.lua5_4 ];
+        buildInputs = [ odin final.lua5_4 ];
         buildPhase = ''
-	  make desktop
-	'';
-	installPhase = ''
-	  mkdir -p $out/bin
+          make desktop
+        '';
+        installPhase = ''
+          mkdir -p $out/bin
           cp luanim $out/bin/luanim-desktop
-	'';
-	src = ./.;
+        '';
+        src = ./.;
       };
       luanim_wasm = final.stdenv.mkDerivation {
         name = "luanim-wasm";
-	buildInputs = [ final.emscripten ];
-	configurePhase = ''
-	  export EM_CACHE=$(pwd)/.emcache
-	'';
+        buildInputs = [ odin final.lua5_4 final.pkg-config final.emscripten ];
+        configurePhase = ''
+          export EM_CACHE=$(pwd)/.emcache
+        '';
         buildPhase = ''
-	  make wasm
-	'';
-	installPhase = ''
-	  mkdir -p $out/
+          make wasm BUILD=debug
+        '';
+        installPhase = ''
+          mkdir -p $out/
           cp build/wasm/* $out/
-	'';
-	src = ./.;
+        '';
+        src = ./.;
       };
     };
     packages.x86_64-linux = rec {

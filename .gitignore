@@ -8,5 +8,7 @@ build/**/*.*
 !build/wasm/index.html
 .vscode/
 .emcache/
+src/files.h
+**/*.bin
 
 *.o
