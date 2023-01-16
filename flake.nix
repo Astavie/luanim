@@ -9,22 +9,14 @@
       system = "x86_64-linux";
       overlays = [ self.overlays.default ];
     };
+    apkgs = import nixpkgs {
+      system = "x86_64-linux";
+      overlays = [ astapkgs.overlays.default ];
+    };
   in {
     overlays.default = final: prev: let
       odin = (astapkgs.overlays.default final prev).odin;
     in {
-      luanim_desktop = final.stdenv.mkDerivation {
-        name = "luanim-desktop";
-        buildInputs = [ odin final.lua5_4 ];
-        buildPhase = ''
-          make desktop
-        '';
-        installPhase = ''
-          mkdir -p $out/bin
-          cp luanim $out/bin/luanim-desktop
-        '';
-        src = ./.;
-      };
       luanim_wasm = final.stdenv.mkDerivation {
         name = "luanim-wasm";
         buildInputs = [ odin final.lua5_4 final.pkg-config final.emscripten ];
@@ -32,7 +24,7 @@
           export EM_CACHE=$(pwd)/.emcache
         '';
         buildPhase = ''
-          make wasm BUILD=debug
+          make wasm
         '';
         installPhase = ''
           mkdir -p $out/
@@ -42,8 +34,13 @@
       };
     };
     packages.x86_64-linux = rec {
-      inherit (pkgs) luanim_desktop luanim_wasm;
-      default = luanim_desktop;
+      inherit (pkgs) luanim_wasm;
+    };
+    devShells.x86_64-linux.default = with apkgs; mkShell {
+      buildInputs = [ odin ols lua5_4 emscripten pkg-config ];
+      shellHook = ''
+          export EM_CACHE=$(pwd)/.emcache
+      '';
     };
   };
 }

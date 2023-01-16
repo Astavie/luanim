@@ -12,3 +12,6 @@ src/files.h
 **/*.bin
 
 *.o
+.direnv
+.envrc
+build

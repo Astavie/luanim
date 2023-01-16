@@ -1,4 +1,5 @@
 #include <lauxlib.h>
+#include "luanim.h"
 #include "files.h"
 
 void luanim_openlib(lua_State* L, const char* modname, lua_CFunction openf, int glb) {

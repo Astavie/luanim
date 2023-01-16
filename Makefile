@@ -10,15 +10,11 @@ BUILD = release
 
 ifeq (${BUILD},release)
     OPT_EMCC=-Os -flto -sEVAL_CTORS=2
-    OPT_ODIN_WASM=-o:size
-    OPT_ODIN_DESKTOP=-o:speed
 else
     OPT_EMCC=-O1
-    OPT_ODIN_WASM=-o:minimal
-    OPT_ODIN_DESKTOP=-o:minimal
 endif
 
-all: wasm desktop
+all: wasm
 
 ${LUADIR}/liblua.a:
 	cd ${LUADIR} ; make liblua.a CC='emcc' AR='emar rcs' RANLIB='echo' CFLAGS= '-Wall -Os -flto -std=c99 -DLUA_USE_LINUX -DLUA_USE_READLINE -fno-stack-protector -fno-common -march=native'
@@ -35,12 +31,7 @@ wasm: ${SOURCE} ${LUADIR}/liblua.a
 	cp ./test/example.lua ${WASMDIR}
 	cp ./test/luanim.js ${WASMDIR}
 
-desktop: ${SOURCE}
-	${ODIN} build ./test ${OPT_ODIN_DESKTOP} -out:./luanim
-
 clean:
 	rm -rf ${BUILDDIR}
-	rm ./luanim
-	rm ./luanim.o
 
-.PHONY: all wasm desktop clean
+.PHONY: all wasm clean
