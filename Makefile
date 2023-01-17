@@ -26,7 +26,7 @@ ${LUADIR}/liblua.a:
 wasm: ${SOURCE} ${LUADIR}/liblua.a
 	mkdir -p ${OBJDIR}
 	mkdir -p ${WASMDIR}
-	emcc ./src/luanim.c ${LUADIR}/liblua.a ${OPT_EMCC} `pkg-config --cflags --libs lua-5.4` -o ${WASMDIR}/lua.js -sEXPORTED_FUNCTIONS="['_luanim_openlibs','_luaL_newstate','_luaL_openlibs','_luaL_loadstring','_lua_pcallk','_lua_close','_lua_tolstring']" -sEXPORTED_RUNTIME_METHODS="['allocateUTF8','addFunction','UTF8ToString']" -sALLOW_TABLE_GROWTH -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
+	emcc ./src/luanim.c ${LUADIR}/liblua.a ${OPT_EMCC} `pkg-config --cflags --libs lua-5.4` -o ${WASMDIR}/lua.js --js-library ./test/library.js -sEXPORTED_FUNCTIONS="['_luanim_openlibs','_luanim_html_play','_luanim_html_advance','_luaL_newstate','_luaL_openlibs','_lua_close','_lua_tolstring']" -sEXPORTED_RUNTIME_METHODS="['getValue','UTF8ToString','allocateUTF8']" -sENVIRONMENT=web -sEXPORT_ES6=1 -sMODULARIZE=1
 	cp ./test/index.html ${WASMDIR}
 	cp ./test/example.lua ${WASMDIR}
 	cp ./test/luanim.js ${WASMDIR}

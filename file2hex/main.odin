@@ -27,7 +27,7 @@ main :: proc() {
 			continue
 		}
 		
-		fmt.sbprintf(&buf, "const char %s[] = {{ ", ignore(strings.replace_all(path.base(file), ".", "_")))
+		fmt.sbprintf(&buf, "static const char %s[] = {{ ", ignore(strings.replace_all(path.base(file), ".", "_")))
 
 		for char in chars {
 			fmt.sbprintf(&buf, "%#2x, ", char)

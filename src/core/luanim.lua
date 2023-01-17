@@ -147,7 +147,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
 end
 
 ---@param ... fun(scene: Scene)
-function luanim.run(...)
+function luanim.play(...)
   for _, func in ipairs({...}) do
     local scene = luanim.Scene.new()
     scene:parallel(func)

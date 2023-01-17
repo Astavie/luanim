@@ -1,6 +1,6 @@
 local shapes = require 'shapes'
 local tweens = require 'tweens'
--- local canvas = require 'canvas'
+local canvas = require 'canvas'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
@@ -28,11 +28,9 @@ local function scene1(scene)
 
   -- create custom animation
   -- function has a parameter 'p' which interpolates from 0 to 1
-  -- (optional second parameter for delta?)
   local orbit = function (p)
     -- you're not allowed to use most scene methods here
     -- this is because the function won't be executed inside the coroutine
-    -- (adding/removing objects might still be allowed since those are instant?)
     circle.value.x = math.cos(p * 2 * math.pi) * 0.5
     circle.value.y = math.sin(p * 2 * math.pi) * 0.5
   end
@@ -43,12 +41,4 @@ local function scene1(scene)
   scene:terminate(co)
 end
 
-local canvas = {}
-function canvas:draw_circle(x, y, radius)
-  print("x: " .. x .. ", y: " .. y .. ", r: " .. radius)
-end
-
-shapes.run(canvas, scene1)
-
--- potential export targets:
--- * html canvas
+shapes.play(canvas, scene1)

@@ -5,11 +5,13 @@ class Luanim {
         this.lua = lua
         this.L = L
     }
-    async run(url) {
+    async play(url) {
         const script = await (await fetch(url)).text()
         const ptr = this.lua.allocateUTF8(script)
-        return this.lua._luaL_loadstring(this.L, ptr) ||
-               this.lua._lua_pcallk(this.L, 0, -1, 0, 0, null)
+        return this.lua._luanim_html_play(this.L, ptr) ? true : false
+    }
+    advance() {
+        return this.lua._luanim_html_advance(this.L) ? true : false
     }
     peekstring() {
         return this.lua.UTF8ToString(this.lua._lua_tolstring(this.L, -1, null))
@@ -19,8 +21,8 @@ class Luanim {
     }
 }
 
-export default async function load_luanim(print, lib_dir = "") {
-    const lua = await factory({ print })
+export default async function load_luanim(funcs, lib_dir = "") {
+    const lua = await factory(funcs);
 
     const L = lua._luaL_newstate()
 

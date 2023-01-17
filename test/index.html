@@ -8,27 +8,64 @@
 </head>
 <body>
     <p id="stdout"></p>
+    <canvas id="canvas" width="200" height="100" style="border:1px solid #000000;"></canvas>
     <script type="module">
         import luanim from "./luanim.js"
 
         async function main() {
             const stdout = document.getElementById("stdout")
+            const canvas = document.getElementById("canvas")
+            const ctx = canvas.getContext("2d")
+            
             const start = Date.now()
             const print = text => {
                 const now = Date.now()
                 const diff = (now - start) / 1000
                 stdout.innerText += `[${diff}] ${text}\n`
             }
+       
+            function ci(x) {
+                return x / 2 * canvas.width
+            }
 
-            const instance = await luanim(print)
+            function cy(y) {
+                return ci(y) + canvas.height / 2
+            }
+
+            function cx(x) {
+                return ci(x) + canvas.width / 2
+            }
+
+            const instance = await luanim({ 
+                print,
+                frame_start() {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+                },
+                draw_circle(x, y, radius) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+                    ctx.beginPath()
+                    ctx.arc(cx(x), cy(y), ci(radius), 0, 2 * Math.PI)
+                    ctx.stroke()
+                },
+            })
             if (!instance) {
                 print("could not start luanim")
                 return
             }
 
-            const ret = await instance.run("example.lua")
-            if (ret != 0) {
+            const ret = await instance.play("example.lua")
+            if (!ret) {
                 print(instance.peekstring())
+            } else {
+                await new Promise(resolve => {
+                    const interval = setInterval(function() {
+                        const resume = instance.advance()
+                        if (!resume) {
+                            clearInterval(interval)
+                            resolve()
+                        }
+                    }, 16);
+                })
             }
 
             instance.close()

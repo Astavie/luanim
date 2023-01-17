@@ -73,6 +73,7 @@ function shapes.Circle.new(x, y, radius)
 end
 
 ---@class Canvas
+---@field play        fun(self, func: fun(canvas: Canvas): boolean)
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
 
 ---@class ShapesScene : Scene
@@ -106,22 +107,23 @@ function shapes.Shapes:remove(shape)
   self.shapes[shape.id] = nil
 end
 
----@param canvas Canvas
----@param ... fun(scene: ShapesScene)
-function shapes.run(canvas, ...)
-  for _, func in ipairs({...}) do
-    local scene = shapes.Shapes.new()
-    scene:parallel(func)
+function shapes.play(canvas, func)
+  local scene = shapes.Shapes.new()
+  scene:parallel(func)
 
-    local frame = 0
-    while true do
-      for _, shape in pairs(scene.shapes) do
-      	shape:draw(canvas)
-      end
-      if not luanim.advance_frame(scene, 60, frame) then break end
-      frame = frame + 1
+  local frame = 0
+  canvas:play(function ()
+    for _, shape in pairs(scene.shapes) do
+      shape:draw(canvas)
     end
-  end
+
+    if not luanim.advance_frame(scene, 60, frame) then
+      return false
+    end
+
+    frame = frame + 1
+    return true
+  end)
 end
 
 return shapes

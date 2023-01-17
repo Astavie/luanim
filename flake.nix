@@ -37,7 +37,7 @@
       inherit (pkgs) luanim_wasm;
     };
     devShells.x86_64-linux.default = with apkgs; mkShell {
-      buildInputs = [ odin ols lua5_4 emscripten pkg-config ];
+      buildInputs = [ odin ols lua5_4 emscripten pkg-config php ];
       shellHook = ''
           export EM_CACHE=$(pwd)/.emcache
       '';
