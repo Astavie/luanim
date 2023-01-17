@@ -8,15 +8,25 @@
 </head>
 <body>
     <p id="stdout"></p>
-    <canvas id="canvas" width="200" height="100" style="border:1px solid #000000;"></canvas>
+    <center><canvas id="canvas" width="640" height="360" style="border:1px solid #000000;"></canvas>
+    <br>
+    <input id="button" type="button" value="play"></input></center>
+    <br>
+    <textarea id="script" style="width: 100%; height: 100vh;"></textarea>
     <script type="module">
         import luanim from "./luanim.js"
 
-        async function main() {
-            const stdout = document.getElementById("stdout")
-            const canvas = document.getElementById("canvas")
-            const ctx = canvas.getContext("2d")
-            
+        const stdout = document.getElementById("stdout")
+        const canvas = document.getElementById("canvas")
+        const script = document.getElementById("script")
+        const button = document.getElementById("button")
+        const ctx = canvas.getContext("2d")
+
+        button.addEventListener('click', run)
+
+        async function run() {
+            stdout.innerText = "";
+
             const start = Date.now()
             const print = text => {
                 const now = Date.now()
@@ -24,36 +34,35 @@
                 stdout.innerText += `[${diff}] ${text}\n`
             }
        
-            function ci(x) {
-                return x / 2 * canvas.width
-            }
-
-            function cy(y) {
-                return ci(y) + canvas.height / 2
-            }
-
-            function cx(x) {
-                return ci(x) + canvas.width / 2
-            }
-
             const instance = await luanim({ 
                 print,
                 frame_start() {
+                    ctx.resetTransform()
                     ctx.clearRect(0, 0, canvas.width, canvas.height)
+                    ctx.translate(canvas.width / 2, canvas.height / 2)
+                    ctx.scale(canvas.width / 2, canvas.width / 2)
+                    ctx.lineWidth = 0.01
                 },
-                draw_circle(x, y, radius) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+                draw_ellipse(x, y, rx, ry, rot) {
+                    ctx.fillStyle = 'black';
                     ctx.beginPath()
-                    ctx.arc(cx(x), cy(y), ci(radius), 0, 2 * Math.PI)
+                    ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
+                    ctx.fill()
+                },
+                draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2) {
+                    ctx.beginPath()
+                    ctx.moveTo(x1, y1)
+                    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x2, y2)
                     ctx.stroke()
                 },
             })
+
             if (!instance) {
                 print("could not start luanim")
                 return
             }
 
-            const ret = await instance.play("example.lua")
+            const ret = instance.load(script.value)
             if (!ret) {
                 print(instance.peekstring())
             } else {
@@ -70,8 +79,6 @@
 
             instance.close()
         }
-
-        main()
     </script>
 </body>
 </html>

@@ -1,50 +1,164 @@
 #include <lauxlib.h>
+#include <math.h>
 #include "luanim.h"
 #include "files.h"
 
 typedef struct {
+  double x, y;
+} Point;
+
+typedef struct {
   enum {
-    SHAPE_NULL = 0,
-    SHAPE_CIRCLE = 1,
+    SHAPE_NULL    = 0,
+    SHAPE_ELLIPSE = 1,
+    SHAPE_BEZIER  = 2,
   } type;
   union {
     struct {
-      double x, y, radius;
-    } circle;
+      Point center, radii;
+      double rotation;
+    } ellipse;
+    struct {
+      Point start, cp1, cp2, end;
+    } bezier;
   } value;
 } Shape;
 
-extern void luanim_html_draw(Shape* shapes);
+typedef struct {
+  double a, b, c, d, e, f;
+} Matrix;
 
-#define SHAPES_COUNT 2
-static Shape shapes[SHAPES_COUNT + 1];
+extern void canvas_frame();
+extern void canvas_draw(Shape* shapes);
 
-static int canvas_html_play(lua_State* L) {
-  if (lua_gettop(L) != 2) {
-    return luaL_error(L, "expecting exactly 2 arguments");
-  }
+#define SHAPES_COUNT 8196
+static Shape shapes_stack[SHAPES_COUNT];
+static Shape* shapes_ptr = shapes_stack;
 
+#define MATRIX_COUNT 255
+static Matrix matrix_stack[MATRIX_COUNT];
+static Matrix* matrix_ptr = matrix_stack;
+
+static int canvas_play(lua_State* L) {
+  lua_pushvalue(L, 1);
   lua_pushliteral(L, "_advance");
-  lua_pushvalue(L, -2);
-  lua_settable(L, -4);
+  lua_pushvalue(L, 2);
+  lua_settable(L, -3);
   return 0;
 }
 
-static int canvas_html_draw_circle(lua_State* L) {
-  size_t first = 0;
-  while (first < SHAPES_COUNT && shapes[first].type != SHAPE_NULL) first++;
-  if (first == SHAPES_COUNT) return 0;
+static Matrix transform_matrix(Matrix a, Matrix b) {
+  return (Matrix) {
+    a.a * b.a + a.c * b.b, a.b * b.a + a.d * b.b,
+    a.a * b.c + a.c * b.d, a.b * b.c + a.d * b.d,
+    a.a * b.e + a.c * b.f + a.e, a.b * b.e + a.d * b.f + a.f,
+  };
+}
 
-  shapes[first].type = SHAPE_CIRCLE;
-  shapes[first].value.circle.x      = luaL_checknumber(L, 2);
-  shapes[first].value.circle.y      = luaL_checknumber(L, 3);
-  shapes[first].value.circle.radius = luaL_checknumber(L, 4);
+static Point transform_point(Matrix a, Point b) {
+  return (Point) {
+    a.a * b.x + a.c * b.y + a.e,
+    a.b * b.x + a.d * b.y + a.f,
+  };
+}
+
+static Point get_point(lua_State* L, int index) {
+  Point p = {
+    luaL_checknumber(L, index),
+    luaL_checknumber(L, index + 1),
+  };
+  return transform_point(*matrix_ptr, p);
+}
+
+static void add_shape(Shape s) {
+  if (shapes_ptr - shapes_stack == SHAPES_COUNT - 1) {
+    *shapes_ptr = (Shape) {SHAPE_NULL};
+    canvas_draw(shapes_stack);
+    shapes_ptr = shapes_stack;
+  }
+  *shapes_ptr = s;
+  shapes_ptr++;
+}
+
+static double distance(Point a, Point b) {
+  double xdif = a.x - b.x;
+  double ydif = a.y - b.y;
+  return sqrt(xdif * xdif + ydif * ydif);
+}
+
+static int canvas_draw_circle(lua_State* L) {
+  Point center = (Point) {
+    luaL_checknumber(L, 2),
+    luaL_checknumber(L, 3),
+  };
+  Point tcenter = transform_point(*matrix_ptr, center);
+  
+  double radius = luaL_checknumber(L, 4);
+  Point right = transform_point(*matrix_ptr, (Point) {center.x + radius, center.y});
+  Point top   = transform_point(*matrix_ptr, (Point) {center.x, center.y + radius});
+  Point radii = (Point) {distance(tcenter, right), distance(tcenter, top)};
+
+  double rotation = atan2(right.y - tcenter.y, right.x - tcenter.x);
+
+  add_shape((Shape) {SHAPE_ELLIPSE, {.ellipse = {
+    tcenter, radii, rotation
+  }}});
   return 0;
 }
 
-static const struct luaL_Reg canvas_html[] = {
-  {"play",        canvas_html_play},
-  {"draw_circle", canvas_html_draw_circle},
+static int canvas_draw_point(lua_State* L) {
+  double radius = luaL_checknumber(L, 4);
+  add_shape((Shape) {SHAPE_ELLIPSE, {.ellipse = {
+    get_point(L, 2),
+    {radius, radius},
+    0,
+  }}});
+  return 0;
+}
+
+static int canvas_draw_line(lua_State* L) {
+  Point start = get_point(L, 2);
+  Point end   = get_point(L, 4);
+  add_shape((Shape) {SHAPE_BEZIER, {.bezier = {
+    start,
+    start,
+    end,
+    end,
+  }}});
+  return 0;
+}
+
+static int canvas_push_matrix(lua_State* L) {
+  Matrix m = {
+    luaL_checknumber(L, 2),
+    luaL_checknumber(L, 3),
+    luaL_checknumber(L, 4),
+    luaL_checknumber(L, 5),
+    luaL_checknumber(L, 6),
+    luaL_checknumber(L, 7),
+  };
+  m = transform_matrix(m, *matrix_ptr);
+
+  if (matrix_ptr - matrix_stack == MATRIX_COUNT - 1) return 0;
+  matrix_ptr++;
+  *matrix_ptr = m;
+  return 0;
+}
+
+static int canvas_pop_matrix(lua_State* L) {
+  if (matrix_ptr > matrix_stack) {
+    matrix_ptr -= 1;
+  }
+  return 0;
+}
+
+static const struct luaL_Reg canvas[] = {
+  {"play",        canvas_play},
+  {"draw_circle", canvas_draw_circle},
+  {"draw_point",  canvas_draw_point},
+  {"draw_line",   canvas_draw_line},
+  {"push_matrix", canvas_push_matrix},
+  {"pop_matrix",  canvas_pop_matrix},
   {NULL, NULL}
 };
 
@@ -63,7 +177,7 @@ static int open_shapes(lua_State* L) {
   return 1;
 }
 
-static int open_canvas_html(lua_State* L) {
+static int open_canvas(lua_State* L) {
   lua_getglobal(L, "$canvas");
   return 1;
 }
@@ -80,21 +194,23 @@ void luanim_openlibs(lua_State* L) {
   openlib(L, "shapes", open_shapes, 0);
 }
 
-int luanim_html_play(lua_State* L, const char* script) {
+int canvas_load(lua_State* L, const char* script) {
   // canvas backend
-  luaL_newlib(L, canvas_html);
+  luaL_newlib(L, canvas);
   lua_setglobal(L, "$canvas");
-  openlib(L, "canvas", open_canvas_html, 0);
+  openlib(L, "canvas", open_canvas, 0);
 
   // run script
   return luaL_dostring(L, script) ? 0 : 1;
 }
 
-int luanim_html_advance(lua_State* L) {
-  for (size_t i = 0; i <= SHAPES_COUNT; i++) {
-    shapes[i].type = SHAPE_NULL;
-  }
+int canvas_advance(lua_State* L) {
+  shapes_ptr = shapes_stack;
+  matrix_ptr = matrix_stack;
+  *matrix_ptr = (Matrix) {1, 0, 0, 1, 0, 0};
 
+  canvas_frame();
+  
   lua_getglobal(L, "$canvas");
   lua_pushliteral(L, "_advance");
   lua_gettable(L, -2);
@@ -104,7 +220,8 @@ int luanim_html_advance(lua_State* L) {
 
   int result = lua_toboolean(L, -1);
 
-  luanim_html_draw(shapes);
+  *shapes_ptr = (Shape) {SHAPE_NULL};
+  canvas_draw(shapes_stack);
 
   return result;
 }
