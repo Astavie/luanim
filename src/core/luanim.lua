@@ -4,7 +4,7 @@ local luanim = {}
 ---@field start    seconds
 ---@field duration seconds
 ---@field anim?    animation
----@field tween?   tween
+---@field easing?   easing
 
 ---@class Scene
 ---@field package time      seconds
@@ -30,10 +30,10 @@ end
 ---@param self Scene
 ---@param anim animation
 ---@param time? seconds
----@param tween? tween
-function luanim.Scene:play(anim, time, tween)
-  if time == nil then time = 0 end
-  coroutine.yield({ start = self.time, duration = time, anim = anim, tween = tween })
+---@param easing? easing
+function luanim.Scene:play(anim, time, easing)
+  time = time or 0
+  coroutine.yield({ start = self.time, duration = time, anim = anim, easing = easing })
 end
 
 ---@alias id integer
@@ -73,9 +73,11 @@ function luanim.Scene.new()
   return scene
 end
 
+setmetatable(luanim.Scene, { __call = function(self, ...) return self.new(...) end })
+
 ---@alias seconds number
 ---@alias animation fun(p: number, delta?: number)
----@alias tween fun(p: number): number
+---@alias easing fun(p: number): number
 
 ---@param instr Instruction
 ---@param frame_time number
@@ -126,7 +128,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
 
     if instr.anim ~= nil and scene.time > instr.start then
       local p = (scene.time - instr.start) / instr.duration
-      if instr.tween ~= nil then p = instr.tween(p) end
+      if instr.easing ~= nil then p = instr.easing(p) end
       instr.anim(p, delta)
     end
 
@@ -149,7 +151,7 @@ end
 ---@param ... fun(scene: Scene)
 function luanim.play(...)
   for _, func in ipairs({...}) do
-    local scene = luanim.Scene.new()
+    local scene = luanim.Scene()
     scene:parallel(func)
     local frame = 0
     while luanim.advance_frame(scene, 60, frame) do frame = frame + 1 end

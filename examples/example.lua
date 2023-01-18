@@ -1,26 +1,26 @@
 local shapes = require 'shapes'
-local tweens = require 'tweens'
+local vector = require 'vector'
 local canvas = require 'canvas'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
   while true do
-    scene:play(object:radius(0.33), 0.5, tweens.lerp)
-    scene:play(object:radius(0.5),  0.5, tweens.lerp)
+    scene:play(object:radius(0.33), 0.5)
+    scene:play(object:radius(0.5),  0.5)
   end
 end
 
 ---@param scene ShapesScene
-local function scene1(scene)
+local function scene1(scene, root)
   -- scene:wait and scene:play yield instructions to the player
   -- this way concurrent animations can work pretty straightforward
   scene:wait(0.5)
 
-  local circle = shapes.Circle.new(0, 0, 0.5)
+  local circle = shapes.Circle(0, 0, 0.5)
 
-  scene:add(circle)
-  scene:play(circle:x(-0.5)) -- 'circle.value.x = -0.5' should also work
-  scene:play(circle:x( 0.5), 1, tweens.lerp)
+  root:add_child(circle)
+  scene:play(circle:pos(vector.vec2(-0.5, 0))) -- 'circle.value.pos.x = -0.5' should also work
+  scene:play(circle:pos(vector.vec2( 0.5, 0)), 1)
 
   -- grow and shrink circle indefinitely
   local co = scene:parallel(flash, circle)
@@ -31,11 +31,11 @@ local function scene1(scene)
   local orbit = function (p)
     -- you're not allowed to use most scene methods here
     -- this is because the function won't be executed inside the coroutine
-    circle.value.x = math.cos(p * 2 * math.pi) * 0.5
-    circle.value.y = math.sin(p * 2 * math.pi) * 0.5
+    circle.transform.pos.x = math.cos(p * 2 * math.pi) * 0.5
+    circle.transform.pos.y = math.sin(p * 2 * math.pi) * 0.5
   end
 
-  scene:play(orbit, 5, tweens.lerp)
+  scene:play(orbit, 5)
 
   -- make sure to terminate execution of infinite scenes
   scene:terminate(co)

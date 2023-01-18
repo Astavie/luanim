@@ -1,75 +1,142 @@
-local luanim = require 'luanim';
+local luanim = require 'luanim'
+local tweens = require 'tweens'
+local vector = require 'vector'
 
 local shapes = {}
 local global_id = 0
 
----@class Shape
----@field package id id
----@field draw fun(self, canvas: Canvas)
----@field copy fun(self): Shape
-
-local function base_interp(a, b, p)
-  return (1 - p) * a + p * b
-end
-
-local function integer_interp(a, b, p)
-  local base = base_interp(a + 1, b, p)
-  return math.floor(base)
-end
-
-local function logarithmic_interp(a, b, p)
-  local loga = math.log(a)
-  local logb = math.log(b)
-  local interp = base_interp(loga, logb, p)
-  return math.exp(interp)
-end
-
-local function base_copy(self)
-  local copy = {
-    id = shapes.next_id(),
-    value = {},
-  }
-  for k, v in pairs(self.value) do
-    copy.value[k] = v
-  end
-  return copy
-end
-
 ---@param key string
 ---@param interp? fun(a, b, p: number): any
----@return fun(self, value): animation
-function shapes.animator(key, interp)
-  if interp == nil then
-    interp = base_interp
-  end
-  return function(self, value)
-    local start = self.value[key]
-    return function(p)
-      self.value[key] = interp(start, value, p)
+---@param sub? string
+---@return fun(self, a, b?, c?): animation
+function shapes.animator(key, interp, sub)
+  sub = sub or 'value'
+  interp = interp or tweens.interp.linear
+
+  return function(self, from, to, interp2)
+    -- get interpolation function
+    if interp2 == nil then
+      if type(to) == "function" then
+        interp2 = to
+      else
+        interp2 = interp
+      end
     end
+    -- get from, to
+    if to == nil or type(to) == "function" then
+      to = from
+      from = self[sub][key]
+    end
+    -- return animation
+    return function(p)
+      self[sub][key] = interp2(from, to, p)
+    end
+  end
+end
+
+--- SHAPE ---
+
+---@class Transform
+---@field pos vec2
+---@field angle number
+---@field scale vec2
+
+---@class Shape
+---@field package id id
+---@field package children table<id, Shape>
+---@field package parent? Shape
+---@field value any
+---@field transform Transform
+---@field protected draw fun(self, canvas: Canvas)
+shapes.Shape = {}
+shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
+shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
+shapes.Shape.scale = shapes.animator('scale', nil, 'transform')
+shapes.Shape.__index = shapes.Shape
+
+---@param self Shape
+---@param canvas Canvas
+function shapes.Shape:draw_shape(canvas)
+  local cos = math.cos(self.transform.angle)
+  local sin = math.sin(self.transform.angle)
+
+  local a =  cos * self.transform.scale.x
+  local b =  sin * self.transform.scale.x
+  local c = -sin * self.transform.scale.y
+  local d =  cos * self.transform.scale.y
+  local e = self.transform.pos.x
+  local f = self.transform.pos.y
+
+  canvas:push_matrix(a, b, c, d, e, f)
+  self:draw(canvas)
+  canvas:pop_matrix()
+end
+
+---@param transform? Transform
+---@param value? any
+---@param metatable? table
+---@return any
+---@nodiscard
+function shapes.Shape.new(transform, value, metatable)
+  if metatable == nil then
+    metatable = shapes.Shape
+  end
+
+  transform = transform or {}
+  transform.pos = transform.pos or vector.vec2(0, 0)
+  transform.angle = transform.angle or 0
+  transform.scale = transform.scale or vector.vec2(1, 1)
+
+  local shape = {
+    id = shapes.next_id(),
+    transform = transform,
+    value = value,
+    children = {},
+  }
+
+  setmetatable(shape, metatable)
+  return shape
+end
+
+function shapes.Shape:__call(...) return self.new(...) end
+setmetatable(shapes.Shape, { __call = function(self, ...) return self.new(...) end })
+
+---@param self Shape
+---@param child Shape
+function shapes.Shape:add_child(child)
+  if child.parent ~= nil then
+	  child.parent:remove_child(child)
+  end
+
+  child.parent = self
+  self.children[child.id] = child
+end
+
+---@param self Shape
+---@param child Shape
+function shapes.Shape:remove_child(child)
+  if self.children[child.id] ~= nil then
+    self.children[child.id] = nil
+    child.parent = nil
   end
 end
 
 --- CIRCLE ---
 
 ---@class CircleValue
----@field x      number
----@field y      number
 ---@field radius number
 
 ---@class Circle : Shape
 ---@field value CircleValue
 shapes.Circle         = {}
-shapes.Circle.x       = shapes.animator('x')
-shapes.Circle.y       = shapes.animator('y')
 shapes.Circle.radius  = shapes.animator('radius')
-shapes.Circle.copy    = base_copy
 shapes.Circle.__index = shapes.Circle
+setmetatable(shapes.Circle, shapes.Shape)
 
 ---@param self Circle
 ---@param canvas Canvas
 function shapes.Circle:draw(canvas)
-  canvas:draw_circle(self.value.x, self.value.y, self.value.radius)
+  canvas:draw_circle(0, 0, self.value.radius)
 end
 
 ---@param x number
@@ -78,18 +145,7 @@ end
 ---@return Circle
 ---@nodiscard
 function shapes.Circle.new(x, y, radius)
-  ---@type Circle
-  local circle = {
-    id = shapes.next_id(),
-    value = {
-      x = x,
-      y = y,
-      radius = radius
-    }
-  }
-
-  setmetatable(circle, shapes.Circle)
-  return circle
+  return shapes.Shape({ pos = vector.vec2(x, y) }, { radius = radius }, shapes.Circle)
 end
 
 --- POINT (circle that doesn't scale) ---
@@ -97,16 +153,14 @@ end
 ---@class Point : Shape
 ---@field value CircleValue
 shapes.Point         = {}
-shapes.Point.x       = shapes.animator('x')
-shapes.Point.y       = shapes.animator('y')
 shapes.Point.radius  = shapes.animator('radius')
-shapes.Point.copy    = base_copy
 shapes.Point.__index = shapes.Point
+setmetatable(shapes.Point, shapes.Shape)
 
 ---@param self Point
 ---@param canvas Canvas
 function shapes.Point:draw(canvas)
-  canvas:draw_point(self.value.x, self.value.y, self.value.radius)
+  canvas:draw_point(0, 0, self.value.radius)
 end
 
 ---@param x number
@@ -115,20 +169,8 @@ end
 ---@return Point
 ---@nodiscard
 function shapes.Point.new(x, y, radius)
-  if radius == nil then radius = 0.001 end
-
-  ---@type Point
-  local point = {
-    id = shapes.next_id(),
-    value = {
-      x = x,
-      y = y,
-      radius = radius
-    }
-  }
-
-  setmetatable(point, shapes.Point)
-  return point
+  radius = radius or 0.005
+  return shapes.Shape({ pos = vector.vec2(x, y) }, { radius = radius }, shapes.Point)
 end
 
 --- POINT CLOUD ---
@@ -143,10 +185,10 @@ end
 ---@field value PointCloudValue
 shapes.PointCloud = {}
 shapes.PointCloud.radius = shapes.animator('radius')
-shapes.PointCloud.min = shapes.animator('min', integer_interp)
-shapes.PointCloud.max = shapes.animator('max', integer_interp)
-shapes.PointCloud.copy = base_copy
+shapes.PointCloud.min = shapes.animator('min', tweens.interp.integer)
+shapes.PointCloud.max = shapes.animator('max', tweens.interp.integer)
 shapes.PointCloud.__index = shapes.PointCloud
+setmetatable(shapes.PointCloud, shapes.Shape)
 
 ---@param self PointCloud
 ---@param canvas Canvas
@@ -163,21 +205,16 @@ end
 ---@param radius? number
 ---@return PointCloud
 function shapes.PointCloud.new(point, min, max, radius)
-  if radius == nil then radius = 0.01 end
+  radius = radius or 0.005
 
-  ---@type PointCloud
-  local cloud = {
-    id = shapes.next_id(),
-    value = {
-      point = point,
-      min = min,
-      max = max,
-      radius = radius
-    }
+  local value = {
+    point = point,
+    min = min,
+    max = max,
+    radius = radius
   }
 
-  setmetatable(cloud, shapes.PointCloud)
-  return cloud
+  return shapes.Shape(nil, value, shapes.PointCloud)
 end
 
 --- LINE ---
@@ -195,8 +232,8 @@ shapes.Line.x1      = shapes.animator('x1')
 shapes.Line.x2      = shapes.animator('x2')
 shapes.Line.y1      = shapes.animator('y1')
 shapes.Line.y2      = shapes.animator('y2')
-shapes.Line.copy    = base_copy
 shapes.Line.__index = shapes.Line
+setmetatable(shapes.Line, shapes.Shape)
 
 ---@param self Line
 ---@param canvas Canvas
@@ -205,81 +242,14 @@ function shapes.Line:draw(canvas)
 end
 
 function shapes.Line.new(x1, y1, x2, y2)
-  ---@type Line
-  local line = {
-    id = shapes.next_id(),
-    value = {
-      x1 = x1,
-      y1 = y1,
-      x2 = x2,
-      y2 = y2,
-    }
+  local value = {
+    x1 = x1,
+    y1 = y1,
+    x2 = x2,
+    y2 = y2,
   }
 
-  setmetatable(line, shapes.Line)
-  return line
-end
-
---- GROUP ---
-
----@class GroupValue
----@field display integer
----@field x number
----@field y number
----@field angle number
----@field scale_x number
----@field scale_y number
----@field children Shape[]
-
----@class Group : Shape
----@field value GroupValue
-shapes.Group         = {}
-shapes.Group.display = shapes.animator('display', integer_interp)
-shapes.Group.x       = shapes.animator('x')
-shapes.Group.y       = shapes.animator('y')
-shapes.Group.angle   = shapes.animator('angle')
-shapes.Group.scale_x = shapes.animator('scale_x', logarithmic_interp)
-shapes.Group.scale_y = shapes.animator('scale_y', logarithmic_interp)
-shapes.Group.copy    = base_copy
-shapes.Group.__index = shapes.Group
-
-function shapes.Group:draw(canvas)
-  local cos = math.cos(self.value.angle)
-  local sin = math.sin(self.value.angle)
-
-  local a =  cos * self.value.scale_x
-  local b =  sin * self.value.scale_x
-  local c = -sin * self.value.scale_y
-  local d =  cos * self.value.scale_y
-  local e = self.value.x
-  local f = self.value.y
-
-  canvas:push_matrix(a, b, c, d, e, f)
-  for i, shape in ipairs(self.value.children) do
-	  if self.value.display >= 0 and i > self.value.display then return end
-    shape:draw(canvas)
-  end
-  canvas:pop_matrix()
-end
-
-function shapes.Group.new(...)
-  ---@type Group
-  local group = {
-    id = shapes.next_id(),
-    value = {
-      display = -1,
-      children = {...},
-
-      x = 0,
-      y = 0,
-      angle = 0,
-      scale_x = 1,
-      scale_y = 1,
-    }
-  }
-
-  setmetatable(group, shapes.Group)
-  return group
+  return shapes.Shape(nil, value, shapes.Line)
 end
 
 --- END SHAPES ---
@@ -299,45 +269,17 @@ end
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
 
----@class ShapesScene : Scene
----@field package shapes table<id, Shape>
-shapes.Shapes = {}
-shapes.Shapes.__index = shapes.Shapes
-setmetatable(shapes.Shapes, luanim.Scene)
-
----@return ShapesScene
----@nodiscard
-function shapes.Shapes.new()
-  ---@type ShapesScene
-  ---@diagnostic disable-next-line: assign-type-mismatch
-  local scene = luanim.Scene.new()
-
-  setmetatable(scene, shapes.Shapes)
-  scene.shapes = {}
-
-  return scene
-end
-
----@param self ShapesScene
----@param shape Shape
-function shapes.Shapes:add(shape)
-  self.shapes[shape.id] = shape
-end
-
----@param self ShapesScene
----@param shape Shape
-function shapes.Shapes:remove(shape)
-  self.shapes[shape.id] = nil
-end
-
+---@param canvas Canvas
+---@param func fun(scene: Scene, root: Shape)
 function shapes.play(canvas, func)
-  local scene = shapes.Shapes.new()
-  scene:parallel(func)
+  local scene = luanim.Scene()
+  local root  = shapes.Shape()
+  scene:parallel(func, root)
 
   local frame = 0
   canvas:play(function ()
-    for _, shape in pairs(scene.shapes) do
-      shape:draw(canvas)
+    for _, shape in pairs(root.children) do
+      shape:draw_shape(canvas)
     end
 
     if not luanim.advance_frame(scene, 60, frame) then

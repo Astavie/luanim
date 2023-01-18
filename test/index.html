@@ -8,7 +8,7 @@
 </head>
 <body>
     <p id="stdout"></p>
-    <center><canvas id="canvas" width="640" height="360" style="border:1px solid #000000;"></canvas>
+    <center><canvas id="canvas" width="1280" height="720" style="border:1px solid #000000;"></canvas>
     <br>
     <input id="button" type="button" value="play"></input></center>
     <br>
@@ -44,7 +44,6 @@
                     ctx.lineWidth = 0.01
                 },
                 draw_ellipse(x, y, rx, ry, rot) {
-                    ctx.fillStyle = 'black';
                     ctx.beginPath()
                     ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
                     ctx.fill()

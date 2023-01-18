@@ -172,6 +172,11 @@ static int open_tweens(lua_State* L) {
   return 1;
 }
 
+static int open_vector(lua_State* L) {
+  luaL_dostring(L, vector_lua);
+  return 1;
+}
+
 static int open_shapes(lua_State* L) {
   luaL_dostring(L, shapes_lua);
   return 1;
@@ -191,6 +196,7 @@ void luanim_openlibs(lua_State* L) {
   // core
   openlib(L, "luanim", open_luanim, 0);
   openlib(L, "tweens", open_tweens, 0);
+  openlib(L, "vector", open_vector, 0);
   openlib(L, "shapes", open_shapes, 0);
 }
 
