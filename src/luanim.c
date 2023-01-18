@@ -137,7 +137,7 @@ static int canvas_push_matrix(lua_State* L) {
     luaL_checknumber(L, 6),
     luaL_checknumber(L, 7),
   };
-  m = transform_matrix(m, *matrix_ptr);
+  m = transform_matrix(*matrix_ptr, m);
 
   if (matrix_ptr - matrix_stack == MATRIX_COUNT - 1) return 0;
   matrix_ptr++;

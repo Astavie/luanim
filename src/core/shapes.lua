@@ -47,7 +47,7 @@ end
 ---@field package parent? Shape
 ---@field value any
 ---@field transform Transform
----@field protected draw fun(self, canvas: Canvas)
+---@field protected draw? fun(self, canvas: Canvas)
 shapes.Shape = {}
 shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
 shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
@@ -68,7 +68,12 @@ function shapes.Shape:draw_shape(canvas)
   local f = self.transform.pos.y
 
   canvas:push_matrix(a, b, c, d, e, f)
-  self:draw(canvas)
+  if self.draw ~= nil then
+    self:draw(canvas)
+  end
+  for _, shape in pairs(self.children) do
+    shape:draw_shape(canvas)
+  end
   canvas:pop_matrix()
 end
 
@@ -78,10 +83,7 @@ end
 ---@return any
 ---@nodiscard
 function shapes.Shape.new(transform, value, metatable)
-  if metatable == nil then
-    metatable = shapes.Shape
-  end
-
+  metatable = metatable or shapes.Shape
   transform = transform or {}
   transform.pos = transform.pos or vector.vec2(0, 0)
   transform.angle = transform.angle or 0
@@ -220,33 +222,27 @@ end
 --- LINE ---
 
 ---@class LineValue
----@field x1 number
----@field y1 number
----@field x2 number
----@field y2 number
+---@field v1 vec2
+---@field v2 vec2
 
 ---@class Line : Shape
 ---@field value LineValue
 shapes.Line         = {}
-shapes.Line.x1      = shapes.animator('x1')
-shapes.Line.x2      = shapes.animator('x2')
-shapes.Line.y1      = shapes.animator('y1')
-shapes.Line.y2      = shapes.animator('y2')
+shapes.Line.v1      = shapes.animator('v1')
+shapes.Line.v2      = shapes.animator('v2')
 shapes.Line.__index = shapes.Line
 setmetatable(shapes.Line, shapes.Shape)
 
 ---@param self Line
 ---@param canvas Canvas
 function shapes.Line:draw(canvas)
-  canvas:draw_line(self.value.x1, self.value.y1, self.value.x2, self.value.y2)
+  canvas:draw_line(self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
 end
 
 function shapes.Line.new(x1, y1, x2, y2)
   local value = {
-    x1 = x1,
-    y1 = y1,
-    x2 = x2,
-    y2 = y2,
+    v1 = vector.vec2(x1, y1),
+    v2 = vector.vec2(x2, y2),
   }
 
   return shapes.Shape(nil, value, shapes.Line)
@@ -278,9 +274,7 @@ function shapes.play(canvas, func)
 
   local frame = 0
   canvas:play(function ()
-    for _, shape in pairs(root.children) do
-      shape:draw_shape(canvas)
-    end
+    root:draw_shape(canvas)
 
     if not luanim.advance_frame(scene, 60, frame) then
       return false
