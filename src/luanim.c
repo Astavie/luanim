@@ -8,10 +8,15 @@ typedef struct {
 } Point;
 
 typedef struct {
+  double lineWidth;
+} DrawConfig;
+
+typedef struct {
   enum {
     SHAPE_NULL    = 0,
     SHAPE_ELLIPSE = 1,
     SHAPE_BEZIER  = 2,
+    SHAPE_CONFIG  = 3,
   } type;
   union {
     struct {
@@ -21,6 +26,7 @@ typedef struct {
     struct {
       Point start, cp1, cp2, end;
     } bezier;
+    DrawConfig config;
   } value;
 } Shape;
 
@@ -38,6 +44,8 @@ static Shape* shapes_ptr = shapes_stack;
 #define MATRIX_COUNT 255
 static Matrix matrix_stack[MATRIX_COUNT];
 static Matrix* matrix_ptr = matrix_stack;
+
+static DrawConfig current_config = { 0.005 };
 
 static int canvas_play(lua_State* L) {
   lua_pushvalue(L, 1);
@@ -117,6 +125,13 @@ static int canvas_draw_point(lua_State* L) {
 }
 
 static int canvas_draw_line(lua_State* L) {
+  double width = luaL_checknumber(L, 6);
+
+  if (width != current_config.lineWidth) {
+    current_config.lineWidth = width;
+    add_shape((Shape) {SHAPE_CONFIG, {.config = current_config}});
+  }
+
   Point start = get_point(L, 2);
   Point end   = get_point(L, 4);
   add_shape((Shape) {SHAPE_BEZIER, {.bezier = {
@@ -216,6 +231,7 @@ int canvas_advance(lua_State* L) {
   *matrix_ptr = (Matrix) {1, 0, 0, 1, 0, 0};
 
   canvas_frame();
+  add_shape((Shape) {SHAPE_CONFIG, {.config = current_config}});
   
   lua_getglobal(L, "$canvas");
   lua_pushliteral(L, "_advance");

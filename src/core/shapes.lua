@@ -235,29 +235,33 @@ end
 ---@class LineValue
 ---@field v1 vec2
 ---@field v2 vec2
+---@field width number
 
 ---@class Line : Shape
 ---@field value LineValue
 shapes.Line         = {}
 shapes.Line.v1      = shapes.animator('v1')
 shapes.Line.v2      = shapes.animator('v2')
+shapes.Line.width   = shapes.animator('width')
 shapes.Line.__index = shapes.Line
 setmetatable(shapes.Line, shapes.Shape)
 
 ---@param self Line
 ---@param canvas Canvas
 function shapes.Line:draw(canvas)
-  canvas:draw_line(self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
+  canvas:draw_line(self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y, self.value.width)
 end
 
 ---@param x1 number
 ---@param y1 number
 ---@param x2 number
 ---@param y2 number
-function shapes.Line.new(x1, y1, x2, y2)
+---@param width? number
+function shapes.Line.new(x1, y1, x2, y2, width)
   local value = {
     v1 = vector.vec2(x1, y1),
     v2 = vector.vec2(x2, y2),
+    width = width or 0.005,
   }
 
   return shapes.Shape(nil, value, shapes.Line)
@@ -288,7 +292,7 @@ function shapes.Pointer:draw(canvas)
 end
 
 ---@param shape Shape
----@param max integer
+---@param max? integer
 function shapes.Pointer.new(shape, max)
   max = max or 1
   return shapes.Shape(nil, { shape = shape, iterations = max, _iteration = 0 }, shapes.Pointer)
@@ -307,7 +311,7 @@ end
 ---@field play        fun(self, func: fun(canvas: Canvas): boolean)
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
 ---@field draw_point  fun(self, x: number, y: number, radius: number)
----@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number)
+---@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number, width: number)
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
 

@@ -6,6 +6,7 @@ mergeInto(LibraryManager.library, {
     const SHAPE_END     = 0;
     const SHAPE_ELLIPSE = 1;
     const SHAPE_BEZIER  = 2;
+    const SHAPE_CONFIG  = 3;
 
     while (true) {
       const type = Module.getValue(ptr, 'i8')
@@ -35,6 +36,17 @@ mergeInto(LibraryManager.library, {
         const x2  = Module.getValue(ptr, 'double'); ptr += 8
         const y2  = Module.getValue(ptr, 'double'); ptr += 8
         Module.draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2)
+        break
+      case SHAPE_CONFIG:
+        const lineWidth = Module.getValue(ptr, 'double'); ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+                                                          ptr += 8
+        Module.draw_config(lineWidth)
         break
       }
     }
