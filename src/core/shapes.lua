@@ -54,6 +54,17 @@ shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
 shapes.Shape.scale = shapes.animator('scale', nil, 'transform')
 shapes.Shape.__index = shapes.Shape
 
+function shapes.Shape:copy()
+  local copy = {
+    id = shapes.next_id(),
+    transform = self.transform,
+    value = self.value,
+    children = {},
+  }
+  setmetatable(copy, getmetatable(self))
+  return copy
+end
+
 ---@param self Shape
 ---@param canvas Canvas
 function shapes.Shape:draw_shape(canvas)
@@ -239,6 +250,10 @@ function shapes.Line:draw(canvas)
   canvas:draw_line(self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
 end
 
+---@param x1 number
+---@param y1 number
+---@param x2 number
+---@param y2 number
 function shapes.Line.new(x1, y1, x2, y2)
   local value = {
     v1 = vector.vec2(x1, y1),
@@ -246,6 +261,37 @@ function shapes.Line.new(x1, y1, x2, y2)
   }
 
   return shapes.Shape(nil, value, shapes.Line)
+end
+
+--- POINTER ---
+
+---@class PointerValue
+---@field shape Shape
+---@field iterations integer
+---@field package _iteration integer
+
+---@class Pointer
+---@field value PointerValue
+shapes.Pointer = {}
+shapes.Pointer.iterations = shapes.animator('iterations', tweens.interp.integer)
+shapes.Pointer.__index = shapes.Pointer
+setmetatable(shapes.Pointer, shapes.Shape)
+
+---@param self Pointer
+---@param canvas Canvas
+function shapes.Pointer:draw(canvas)
+  if self.value._iteration == self.value.iterations then return end
+
+  self.value._iteration = self.value._iteration + 1
+  self.value.shape:draw_shape(canvas)
+  self.value._iteration = self.value._iteration - 1
+end
+
+---@param shape Shape
+---@param max integer
+function shapes.Pointer.new(shape, max)
+  max = max or 1
+  return shapes.Shape(nil, { shape = shape, iterations = max, _iteration = 0 }, shapes.Pointer)
 end
 
 --- END SHAPES ---

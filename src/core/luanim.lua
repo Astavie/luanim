@@ -126,7 +126,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
     local delta = next - scene.time
     scene.time = next
 
-    if instr.anim ~= nil and scene.time > instr.start then
+    if instr.anim ~= nil then
       local p = (scene.time - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
       instr.anim(p, delta)
