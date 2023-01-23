@@ -3,7 +3,7 @@ local vector = require 'vector'
 local canvas = require 'canvas'
 
 local function binary_tree(angle, scale, it)
-  local trunk = shapes.Line(0, 0, 0, -1)
+  local trunk = shapes.Shape()
   trunk.transform.scale = vector.vec2(scale.x, scale.y)
 
   local left  = shapes.Pointer(trunk, it)
@@ -18,6 +18,11 @@ local function binary_tree(angle, scale, it)
 
   trunk:add_child(left)
   trunk:add_child(right)
+
+  local text = shapes.Text(0, -1, "Harold")
+  text.transform.angle = math.pi / 2
+  text.transform.scale = vector.vec2(6)
+  trunk:add_child(text)
 
   local tree = shapes.Shape()
   tree:add_child(trunk)

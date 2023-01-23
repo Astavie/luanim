@@ -5,14 +5,8 @@ local vector = require 'vector'
 local shapes = {}
 local global_id = 0
 
----@param key string
----@param interp? fun(a, b, p: number): any
----@param sub? string
----@return fun(self, a, b?, c?): animation
-function shapes.animator(key, interp, sub)
+local function animator2(key, interp, sub)
   sub = sub or 'value'
-  interp = interp or tweens.interp.linear
-
   return function(self, from, to, interp2)
     -- get interpolation function
     if interp2 == nil then
@@ -34,6 +28,14 @@ function shapes.animator(key, interp, sub)
   end
 end
 
+---@param key string
+---@param interp? fun(a, b, p: number): any
+---@param sub? string
+---@return fun(self, a, b?, c?): animation
+function shapes.animator(key, interp, sub)
+  return animator2(key, interp or tweens.interp.linear, sub)
+end
+
 --- SHAPE ---
 
 ---@class Transform
@@ -52,17 +54,26 @@ shapes.Shape = {}
 shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
 shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
 shapes.Shape.scale = shapes.animator('scale', nil, 'transform')
-shapes.Shape.__index = shapes.Shape
 
-function shapes.Shape:copy()
-  local copy = {
-    id = shapes.next_id(),
-    transform = self.transform,
-    value = self.value,
-    children = {},
-  }
-  setmetatable(copy, getmetatable(self))
-  return copy
+function shapes.Shape:__index(key)
+  if key == 'value' then
+    return {}
+  end
+
+  if shapes.Shape[key] ~= nil then
+    return shapes.Shape[key]
+  end
+
+  if self.value[key] ~= nil then
+    return animator2(key)
+  end
+end
+
+---@param self Shape
+---@param max? integer
+---@return Pointer
+function shapes.Shape:pointer(max)
+  return shapes.Pointer(self, max)
 end
 
 ---@param self Shape
@@ -111,7 +122,6 @@ function shapes.Shape.new(transform, value, metatable)
   return shape
 end
 
-function shapes.Shape:__call(...) return self.new(...) end
 setmetatable(shapes.Shape, { __call = function(self, ...) return self.new(...) end })
 
 ---@param self Shape
@@ -134,6 +144,19 @@ function shapes.Shape:remove_child(child)
   end
 end
 
+---@return table
+function shapes.newshape()
+  local shape = {}
+  setmetatable(shape, { __call = function(self, ...) return self.new(...) end })
+  function shape:__index(key)
+    if shape[key] ~= nil then
+      return shape[key]
+    end
+    return shapes.Shape.__index(self, key)
+  end
+  return shape
+end
+
 --- CIRCLE ---
 
 ---@class CircleValue
@@ -141,10 +164,8 @@ end
 
 ---@class Circle : Shape
 ---@field value CircleValue
-shapes.Circle         = {}
+shapes.Circle         = shapes.newshape()
 shapes.Circle.radius  = shapes.animator('radius')
-shapes.Circle.__index = shapes.Circle
-setmetatable(shapes.Circle, shapes.Shape)
 
 ---@param self Circle
 ---@param canvas Canvas
@@ -165,10 +186,8 @@ end
 
 ---@class Point : Shape
 ---@field value CircleValue
-shapes.Point         = {}
+shapes.Point         = shapes.newshape()
 shapes.Point.radius  = shapes.animator('radius')
-shapes.Point.__index = shapes.Point
-setmetatable(shapes.Point, shapes.Shape)
 
 ---@param self Point
 ---@param canvas Canvas
@@ -196,12 +215,10 @@ end
 
 ---@class PointCloud : Shape
 ---@field value PointCloudValue
-shapes.PointCloud = {}
+shapes.PointCloud        = shapes.newshape()
 shapes.PointCloud.radius = shapes.animator('radius')
-shapes.PointCloud.min = shapes.animator('min', tweens.interp.integer)
-shapes.PointCloud.max = shapes.animator('max', tweens.interp.integer)
-shapes.PointCloud.__index = shapes.PointCloud
-setmetatable(shapes.PointCloud, shapes.Shape)
+shapes.PointCloud.min    = shapes.animator('min', tweens.interp.integer)
+shapes.PointCloud.max    = shapes.animator('max', tweens.interp.integer)
 
 ---@param self PointCloud
 ---@param canvas Canvas
@@ -239,12 +256,10 @@ end
 
 ---@class Line : Shape
 ---@field value LineValue
-shapes.Line         = {}
+shapes.Line         = shapes.newshape()
 shapes.Line.v1      = shapes.animator('v1')
 shapes.Line.v2      = shapes.animator('v2')
 shapes.Line.width   = shapes.animator('width')
-shapes.Line.__index = shapes.Line
-setmetatable(shapes.Line, shapes.Shape)
 
 ---@param self Line
 ---@param canvas Canvas
@@ -276,10 +291,8 @@ end
 
 ---@class Pointer
 ---@field value PointerValue
-shapes.Pointer = {}
+shapes.Pointer            = shapes.newshape()
 shapes.Pointer.iterations = shapes.animator('iterations', tweens.interp.integer)
-shapes.Pointer.__index = shapes.Pointer
-setmetatable(shapes.Pointer, shapes.Shape)
 
 ---@param self Pointer
 ---@param canvas Canvas
@@ -298,6 +311,28 @@ function shapes.Pointer.new(shape, max)
   return shapes.Shape(nil, { shape = shape, iterations = max, _iteration = 0 }, shapes.Pointer)
 end
 
+--- TEXT ---
+
+---@class TextValue
+---@field text string
+
+---@class Text
+---@field value TextValue
+shapes.Text = shapes.newshape()
+
+---@param self Text
+---@param canvas Canvas
+function shapes.Text:draw(canvas)
+  canvas:draw_text(0, 0, self.value.text)
+end
+
+---@param x number
+---@param y number
+---@param text string
+function shapes.Text.new(x, y, text)
+  return shapes.Shape({ pos = vector.vec2(x, y) }, { text = text }, shapes.Text)
+end
+
 --- END SHAPES ---
 
 ---@return id
@@ -312,6 +347,7 @@ end
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
 ---@field draw_point  fun(self, x: number, y: number, radius: number)
 ---@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number, width: number)
+---@field draw_text   fun(self, x: number, y: number, text: string)
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
 

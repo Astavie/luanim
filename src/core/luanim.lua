@@ -76,7 +76,7 @@ end
 setmetatable(luanim.Scene, { __call = function(self, ...) return self.new(...) end })
 
 ---@alias seconds number
----@alias animation fun(p: number, delta?: number)
+---@alias animation fun(p: number)
 ---@alias easing fun(p: number): number
 
 ---@param instr Instruction
@@ -102,13 +102,11 @@ function luanim.advance_frame(scene, fps, prev_frame)
 
     -- resume while finished
     while end_frame(instr, frame_time) == prev_frame or instr.start + instr.duration == next do
-      local newtime = instr.start + instr.duration
-      local delta = newtime - scene.time
       scene.time = instr.start + instr.duration
 
       -- calculate animation at end
       if instr.anim ~= nil then
-        instr.anim(1, delta)
+        instr.anim(1)
       end
 
       -- resume coroutine
@@ -123,13 +121,12 @@ function luanim.advance_frame(scene, fps, prev_frame)
     end
 
     -- calculate animation inbetween state
-    local delta = next - scene.time
     scene.time = next
 
     if instr.anim ~= nil then
       local p = (scene.time - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
-      instr.anim(p, delta)
+      instr.anim(p)
     end
 
     ::loop_end::

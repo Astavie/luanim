@@ -1,5 +1,6 @@
 #include <lauxlib.h>
 #include <math.h>
+#include <string.h>
 #include "luanim.h"
 #include "files.h"
 
@@ -12,11 +13,19 @@ typedef struct {
 } DrawConfig;
 
 typedef struct {
+  double a, b, c, d, e, f;
+} Matrix;
+
+typedef struct {
   enum {
     SHAPE_NULL    = 0,
     SHAPE_ELLIPSE = 1,
     SHAPE_BEZIER  = 2,
+
     SHAPE_CONFIG  = 3,
+    SHAPE_MATRIX  = 4,
+
+    SHAPE_TEXT    = 5,
   } type;
   union {
     struct {
@@ -26,13 +35,15 @@ typedef struct {
     struct {
       Point start, cp1, cp2, end;
     } bezier;
+
     DrawConfig config;
+    Matrix matrix;
+    struct {
+      Point start;
+      const char* text;
+    } text;
   } value;
 } Shape;
-
-typedef struct {
-  double a, b, c, d, e, f;
-} Matrix;
 
 extern void canvas_frame();
 extern void canvas_draw(Shape* shapes);
@@ -45,7 +56,10 @@ static Shape* shapes_ptr = shapes_stack;
 static Matrix matrix_stack[MATRIX_COUNT];
 static Matrix* matrix_ptr = matrix_stack;
 
+static Matrix identity = {1, 0, 0, 1, 0, 0};
+
 static DrawConfig current_config = { 0.005 };
+static Matrix current_matrix = {1, 0, 0, 1, 0, 0};
 
 static int canvas_play(lua_State* L) {
   lua_pushvalue(L, 1);
@@ -88,6 +102,18 @@ static void add_shape(Shape s) {
   shapes_ptr++;
 }
 
+static void add_transform(Matrix m) {
+  if (memcmp(&current_matrix, &m, sizeof(Matrix)) != 0) {
+    current_matrix = m;
+    add_shape((Shape) {SHAPE_MATRIX, {.matrix = current_matrix}});
+  }
+}
+
+static void add_shape_identity(Shape s) {
+  add_transform(identity);
+  add_shape(s);
+}
+
 static double distance(Point a, Point b) {
   double xdif = a.x - b.x;
   double ydif = a.y - b.y;
@@ -108,7 +134,7 @@ static int canvas_draw_circle(lua_State* L) {
 
   double rotation = atan2(right.y - tcenter.y, right.x - tcenter.x);
 
-  add_shape((Shape) {SHAPE_ELLIPSE, {.ellipse = {
+  add_shape_identity((Shape) {SHAPE_ELLIPSE, {.ellipse = {
     tcenter, radii, rotation
   }}});
   return 0;
@@ -116,7 +142,7 @@ static int canvas_draw_circle(lua_State* L) {
 
 static int canvas_draw_point(lua_State* L) {
   double radius = luaL_checknumber(L, 4);
-  add_shape((Shape) {SHAPE_ELLIPSE, {.ellipse = {
+  add_shape_identity((Shape) {SHAPE_ELLIPSE, {.ellipse = {
     get_point(L, 2),
     {radius, radius},
     0,
@@ -134,7 +160,7 @@ static int canvas_draw_line(lua_State* L) {
 
   Point start = get_point(L, 2);
   Point end   = get_point(L, 4);
-  add_shape((Shape) {SHAPE_BEZIER, {.bezier = {
+  add_shape_identity((Shape) {SHAPE_BEZIER, {.bezier = {
     start,
     start,
     end,
@@ -160,6 +186,17 @@ static int canvas_push_matrix(lua_State* L) {
   return 0;
 }
 
+static int canvas_draw_text(lua_State* L) {
+  Point p = {
+    luaL_checknumber(L, 2),
+    luaL_checknumber(L, 3),
+  };
+  const char* text = strdup(luaL_checkstring(L, 4));
+  add_transform(*matrix_ptr);
+  add_shape((Shape) {SHAPE_TEXT, {.text = {p, text}}});
+  return 0;
+}
+
 static int canvas_pop_matrix(lua_State* L) {
   if (matrix_ptr > matrix_stack) {
     matrix_ptr -= 1;
@@ -172,6 +209,7 @@ static const struct luaL_Reg canvas[] = {
   {"draw_circle", canvas_draw_circle},
   {"draw_point",  canvas_draw_point},
   {"draw_line",   canvas_draw_line},
+  {"draw_text",   canvas_draw_text},
   {"push_matrix", canvas_push_matrix},
   {"pop_matrix",  canvas_pop_matrix},
   {NULL, NULL}
@@ -228,11 +266,12 @@ int canvas_load(lua_State* L, const char* script) {
 int canvas_advance(lua_State* L) {
   shapes_ptr = shapes_stack;
   matrix_ptr = matrix_stack;
-  *matrix_ptr = (Matrix) {1, 0, 0, 1, 0, 0};
+  *matrix_ptr = identity;
 
   canvas_frame();
   add_shape((Shape) {SHAPE_CONFIG, {.config = current_config}});
-  
+  add_shape((Shape) {SHAPE_MATRIX, {.matrix = current_matrix}});
+
   lua_getglobal(L, "$canvas");
   lua_pushliteral(L, "_advance");
   lua_gettable(L, -2);
