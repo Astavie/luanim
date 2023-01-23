@@ -58,14 +58,14 @@ mergeInto(LibraryManager.library, {
       case SHAPE_TEXT:
         const xs  = Module.getValue(ptr, 'double'); ptr += 8
         const ys  = Module.getValue(ptr, 'double'); ptr += 8
+        const siz = Module.getValue(ptr, 'double'); ptr += 8
         const str = Module.getValue(ptr, 'i8*');    ptr += 8
                                                     ptr += 8
                                                     ptr += 8
                                                     ptr += 8
                                                     ptr += 8
-                                                    ptr += 8
         const text = Module.UTF8ToString(str)
-        Module.draw_text(xs, ys, text)
+        Module.draw_text(xs, ys, siz, text)
         Module._free(str)
         break
       }

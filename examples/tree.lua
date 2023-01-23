@@ -4,7 +4,6 @@ local canvas = require 'canvas'
 
 local function binary_tree(angle, scale, it)
   local trunk = shapes.Shape()
-  trunk.transform.scale = vector.vec2(scale.x, scale.y)
 
   local left  = shapes.Pointer(trunk, it)
   local right = shapes.Pointer(trunk, it)
@@ -12,9 +11,11 @@ local function binary_tree(angle, scale, it)
 
   left.transform.angle = -angle.x
   left.transform.pos = vector.vec2(0, -1)
+  left.transform.scale = vector.vec2(scale.x)
 
   right.transform.angle = angle.y
   right.transform.pos = vector.vec2(0, -1)
+  right.transform.scale = vector.vec2(scale.y)
 
   trunk:add_child(left)
   trunk:add_child(right)
@@ -26,23 +27,26 @@ local function binary_tree(angle, scale, it)
 
   local tree = shapes.Shape()
   tree:add_child(trunk)
-  return tree, trunk, left, right
+  return tree, trunk, left, right, text
 end
 
 local function tree_anim(scene, root)
   local angle = vector.vec2(math.pi / 6, math.pi / 4)
   local scale = vector.vec2(0.8, 0.75)
 
-  local tree, trunk, left, right = binary_tree(angle, scale, 9)
+  local tree, trunk, left, right, text = binary_tree(angle, scale, 9)
   tree.transform.pos.y = 0.5
-  tree.transform.scale = vector.vec2(0.33)
+  tree.transform.scale = vector.vec2(0.25)
 
   root:add_child(tree)
   scene:play(function (p)
-    trunk.transform.scale = p * scale
+    p = math.sqrt(p)
+    trunk.transform.scale = vector.vec2(p)
     left.transform.angle = -angle.x * p
     right.transform.angle = angle.y * p
-  end, 5)
+  end, 3)
+
+  scene:play(text:size(0), 1)
 end
 
 shapes.play(canvas, tree_anim)

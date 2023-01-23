@@ -315,22 +315,25 @@ end
 
 ---@class TextValue
 ---@field text string
+---@field size number
 
 ---@class Text
 ---@field value TextValue
-shapes.Text = shapes.newshape()
+shapes.Text      = shapes.newshape()
+shapes.Text.size = shapes.animator('size')
 
 ---@param self Text
 ---@param canvas Canvas
 function shapes.Text:draw(canvas)
-  canvas:draw_text(0, 0, self.value.text)
+  canvas:draw_text(0, 0, self.value.size, self.value.text)
 end
 
 ---@param x number
 ---@param y number
 ---@param text string
-function shapes.Text.new(x, y, text)
-  return shapes.Shape({ pos = vector.vec2(x, y) }, { text = text }, shapes.Text)
+---@param size? number
+function shapes.Text.new(x, y, text, size)
+  return shapes.Shape({ pos = vector.vec2(x, y) }, { text = text, size = size or 1 }, shapes.Text)
 end
 
 --- END SHAPES ---
@@ -347,7 +350,7 @@ end
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
 ---@field draw_point  fun(self, x: number, y: number, radius: number)
 ---@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number, width: number)
----@field draw_text   fun(self, x: number, y: number, text: string)
+---@field draw_text   fun(self, x: number, y: number, size: number, text: string)
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
 

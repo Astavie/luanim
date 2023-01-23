@@ -40,6 +40,7 @@ typedef struct {
     Matrix matrix;
     struct {
       Point start;
+      double size;
       const char* text;
     } text;
   } value;
@@ -191,9 +192,10 @@ static int canvas_draw_text(lua_State* L) {
     luaL_checknumber(L, 2),
     luaL_checknumber(L, 3),
   };
-  const char* text = strdup(luaL_checkstring(L, 4));
+  double size = luaL_checknumber(L, 4);
+  const char* text = strdup(luaL_checkstring(L, 5));
   add_transform(*matrix_ptr);
-  add_shape((Shape) {SHAPE_TEXT, {.text = {p, text}}});
+  add_shape((Shape) {SHAPE_TEXT, {.text = {p, size, text}}});
   return 0;
 }
 

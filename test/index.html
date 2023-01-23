@@ -62,10 +62,10 @@
                     ctx.scale(canvas.width / 2, canvas.width / 2)
                     ctx.transform(a, b, c, d, e, f)
                 },
-                draw_text(x, y, text) {
+                draw_text(x, y, size, text) {
                     ctx.save()
                     ctx.translate(x, y)
-                    ctx.scale(0.005, 0.005)
+                    ctx.scale(0.005 * size, 0.005 * size)
                     ctx.fillText(text, 0, 0)
                     ctx.restore()
                 },
