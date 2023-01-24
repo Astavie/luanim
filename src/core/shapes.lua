@@ -201,7 +201,7 @@ end
 ---@return Point
 ---@nodiscard
 function shapes.Point.new(x, y, radius)
-  radius = radius or 0.005
+  radius = radius or 1
   return shapes.Shape({ pos = vector.vec2(x, y) }, { radius = radius }, shapes.Point)
 end
 
@@ -235,7 +235,7 @@ end
 ---@param radius? number
 ---@return PointCloud
 function shapes.PointCloud.new(point, min, max, radius)
-  radius = radius or 0.005
+  radius = radius or 1
 
   local value = {
     point = point,
@@ -276,7 +276,7 @@ function shapes.Line.new(x1, y1, x2, y2, width)
   local value = {
     v1 = vector.vec2(x1, y1),
     v2 = vector.vec2(x2, y2),
-    width = width or 0.005,
+    width = width or 1,
   }
 
   return shapes.Shape(nil, value, shapes.Line)

@@ -59,13 +59,13 @@
                 set_matrix(a, b, c, d, e, f) {
                     ctx.resetTransform()
                     ctx.translate(canvas.width / 2, canvas.height / 2)
-                    ctx.scale(canvas.width / 2, canvas.width / 2)
+                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
                     ctx.transform(a, b, c, d, e, f)
                 },
                 draw_text(x, y, size, text) {
                     ctx.save()
                     ctx.translate(x, y)
-                    ctx.scale(0.005 * size, 0.005 * size)
+                    ctx.scale(size, size)
                     ctx.fillText(text, 0, 0)
                     ctx.restore()
                 },

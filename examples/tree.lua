@@ -20,7 +20,7 @@ local function binary_tree(angle, scale, it)
   trunk:add_child(left)
   trunk:add_child(right)
 
-  local text = shapes.Text(0, -1, "Harold")
+  local text = shapes.Text(0, -1, "Harold", 0.005)
   text.transform.angle = math.pi / 2
   text.transform.scale = vector.vec2(6)
   trunk:add_child(text)
@@ -35,8 +35,8 @@ local function tree_anim(scene, root)
   local scale = vector.vec2(0.8, 0.75)
 
   local tree, trunk, left, right, text = binary_tree(angle, scale, 9)
-  tree.transform.pos.y = 0.5
-  tree.transform.scale = vector.vec2(0.25)
+  tree.transform.pos.y = 140
+  tree.transform.scale = vector.vec2(70)
 
   root:add_child(tree)
   scene:play(function (p)

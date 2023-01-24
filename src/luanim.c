@@ -59,7 +59,7 @@ static Matrix* matrix_ptr = matrix_stack;
 
 static Matrix identity = {1, 0, 0, 1, 0, 0};
 
-static DrawConfig current_config = { 0.005 };
+static DrawConfig current_config = { 1 };
 static Matrix current_matrix = {1, 0, 0, 1, 0, 0};
 
 static int canvas_play(lua_State* L) {
