@@ -34,6 +34,8 @@
                 stdout.innerText += `[${diff}] ${text}\n`
             }
 
+            let clip = false
+
             const instance = await luanim({ 
                 print,
                 frame_start() {
@@ -43,15 +45,15 @@
                     ctx.restore()
                 },
                 draw_ellipse(x, y, rx, ry, rot) {
-                    ctx.beginPath()
+                    if (!clip) ctx.beginPath()
                     ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
-                    ctx.fill()
+                    if (!clip) ctx.fill()
                 },
                 draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2) {
-                    ctx.beginPath()
+                    if (!clip) ctx.beginPath()
                     ctx.moveTo(x1, y1)
                     ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x2, y2)
-                    ctx.stroke()
+                    if (!clip) ctx.stroke()
                 },
                 draw_config(lineWidth) {
                     ctx.lineWidth = lineWidth
@@ -63,10 +65,27 @@
                     ctx.transform(a, b, c, d, e, f)
                 },
                 draw_text(x, y, size, text) {
+                    if (clip) return // no support for text as clip path
                     ctx.save()
                     ctx.translate(x, y)
                     ctx.scale(size, size)
                     ctx.fillText(text, 0, 0)
+                    ctx.restore()
+                },
+                clip_push() {
+                    console.log("start")
+                    ctx.save()
+                },
+                clip_start() {
+                    ctx.beginPath()
+                    clip = true
+                },
+                clip_end() {
+                    clip = false
+                    ctx.clip()
+                },
+                clip_pop() {
+                    console.log("end")
                     ctx.restore()
                 },
             })

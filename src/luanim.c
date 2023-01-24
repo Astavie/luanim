@@ -1,6 +1,7 @@
 #include <lauxlib.h>
 #include <math.h>
 #include <string.h>
+#include <stdbool.h>
 #include "luanim.h"
 #include "files.h"
 
@@ -16,15 +17,18 @@ typedef struct {
   double a, b, c, d, e, f;
 } Matrix;
 
-typedef struct {
+typedef struct Shape {
   enum {
     SHAPE_NULL    = 0,
-    SHAPE_ELLIPSE = 1,
-    SHAPE_BEZIER  = 2,
-
     SHAPE_CONFIG  = 3,
     SHAPE_MATRIX  = 4,
+    SHAPE_CLIP_PUSH  = 6,
+    SHAPE_CLIP_START = 7,
+    SHAPE_CLIP_END   = 8,
+    SHAPE_CLIP_POP   = 9,
 
+    SHAPE_ELLIPSE = 1,
+    SHAPE_BEZIER  = 2,
     SHAPE_TEXT    = 5,
   } type;
   union {
@@ -38,6 +42,7 @@ typedef struct {
 
     DrawConfig config;
     Matrix matrix;
+
     struct {
       Point start;
       double size;
@@ -53,7 +58,7 @@ extern void canvas_draw(Shape* shapes);
 static Shape shapes_stack[SHAPES_COUNT];
 static Shape* shapes_ptr = shapes_stack;
 
-#define MATRIX_COUNT 255
+#define MATRIX_COUNT 256
 static Matrix matrix_stack[MATRIX_COUNT];
 static Matrix* matrix_ptr = matrix_stack;
 
@@ -61,6 +66,9 @@ static Matrix identity = {1, 0, 0, 1, 0, 0};
 
 static DrawConfig current_config = { 1 };
 static Matrix current_matrix = {1, 0, 0, 1, 0, 0};
+
+#define CLIP_COUNT 256
+static Shape* clip_ptr = NULL;
 
 static int canvas_play(lua_State* L) {
   lua_pushvalue(L, 1);
@@ -94,13 +102,18 @@ static Point get_point(lua_State* L, int index) {
 }
 
 static void add_shape(Shape s) {
-  if (shapes_ptr - shapes_stack == SHAPES_COUNT - 1) {
-    *shapes_ptr = (Shape) {SHAPE_NULL};
-    canvas_draw(shapes_stack);
-    shapes_ptr = shapes_stack;
+  if (clip_ptr != NULL) {
+    *clip_ptr = s;
+    clip_ptr++;
+  } else {
+    if (shapes_ptr - shapes_stack == SHAPES_COUNT - 1) {
+      *shapes_ptr = (Shape) {SHAPE_NULL};
+      canvas_draw(shapes_stack);
+      shapes_ptr = shapes_stack;
+    }
+    *shapes_ptr = s;
+    shapes_ptr++;
   }
-  *shapes_ptr = s;
-  shapes_ptr++;
 }
 
 static void add_transform(Matrix m) {
@@ -206,8 +219,46 @@ static int canvas_pop_matrix(lua_State* L) {
   return 0;
 }
 
+static int canvas_clip(lua_State* L) {
+  Shape* oldptr = clip_ptr;
+
+  Shape clips[CLIP_COUNT];
+  clip_ptr = clips;
+  lua_pushvalue(L, 2); // push clip function
+  lua_pushvalue(L, 1); // push self
+  lua_call(L, 1, 0);
+  Shape* end = clip_ptr;
+  clip_ptr = oldptr;
+
+  if (end > clips) {
+    if (oldptr == NULL) add_shape((Shape) {SHAPE_CLIP_PUSH});
+
+    bool clip_started = false;
+    for (Shape* i = clips; i < end; i++) {
+      if (i->type == SHAPE_CLIP_START) {
+        clip_started = true;
+      } else if (i->type == SHAPE_CLIP_END) {
+        clip_started = false;
+      } else if (!clip_started) {
+        clip_started = true;
+        add_shape((Shape) {SHAPE_CLIP_START});
+      }
+      add_shape(*i);
+    }
+    add_shape((Shape) {SHAPE_CLIP_END});
+  }
+
+  lua_pushvalue(L, 3); // push draw function
+  lua_pushvalue(L, 1); // push self
+  lua_call(L, 1, 0);
+
+  if (end > clips && oldptr == NULL) add_shape((Shape) {SHAPE_CLIP_POP, {.config = current_config}});
+  return 0;
+}
+
 static const struct luaL_Reg canvas[] = {
   {"play",        canvas_play},
+  {"clip",        canvas_clip},
   {"draw_circle", canvas_draw_circle},
   {"draw_point",  canvas_draw_point},
   {"draw_line",   canvas_draw_line},

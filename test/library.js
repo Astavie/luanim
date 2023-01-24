@@ -3,12 +3,17 @@ mergeInto(LibraryManager.library, {
     Module.frame_start()
   },
   canvas_draw: function(ptr) {
-    const SHAPE_END     = 0;
-    const SHAPE_ELLIPSE = 1;
-    const SHAPE_BEZIER  = 2;
-    const SHAPE_CONFIG  = 3;
-    const SHAPE_MATRIX  = 4;
-    const SHAPE_TEXT    = 5;
+    const SHAPE_END     = 0
+    const SHAPE_ELLIPSE = 1
+    const SHAPE_BEZIER  = 2
+    const SHAPE_CONFIG  = 3
+    const SHAPE_MATRIX  = 4
+    const SHAPE_TEXT    = 5
+
+    const SHAPE_CLIP_PUSH  = 6
+    const SHAPE_CLIP_START = 7
+    const SHAPE_CLIP_END   = 8
+    const SHAPE_CLIP_POP   = 9
 
     while (true) {
       const type = Module.getValue(ptr, 'i8')
@@ -39,11 +44,6 @@ mergeInto(LibraryManager.library, {
         const y2  = Module.getValue(ptr, 'double'); ptr += 8
         Module.draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2)
         break
-      case SHAPE_CONFIG:
-        const lineWidth = Module.getValue(ptr, 'double')
-        ptr += 64
-        Module.draw_config(lineWidth)
-        break
       case SHAPE_MATRIX:
         const a = Module.getValue(ptr, 'double'); ptr += 8
         const b = Module.getValue(ptr, 'double'); ptr += 8
@@ -67,6 +67,25 @@ mergeInto(LibraryManager.library, {
         const text = Module.UTF8ToString(str)
         Module.draw_text(xs, ys, siz, text)
         Module._free(str)
+        break
+      case SHAPE_CLIP_PUSH:
+        ptr += 64
+        Module.clip_push()
+        break
+      case SHAPE_CLIP_START:
+        ptr += 64
+        Module.clip_start()
+        break
+      case SHAPE_CLIP_END:
+        ptr += 64
+        Module.clip_end()
+        break
+      case SHAPE_CLIP_POP:
+      case SHAPE_CONFIG:
+        const lineWidth = Module.getValue(ptr, 'double')
+        ptr += 64
+        if (type == SHAPE_CLIP_POP) Module.clip_pop()
+        Module.draw_config(lineWidth)
         break
       }
     }

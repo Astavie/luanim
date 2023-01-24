@@ -46,6 +46,7 @@ end
 ---@class Shape
 ---@field package id id
 ---@field package children table<id, Shape>
+---@field package clips    table<id, Shape>
 ---@field package parent? Shape
 ---@field value any
 ---@field transform Transform
@@ -90,12 +91,20 @@ function shapes.Shape:draw_shape(canvas)
   local f = self.transform.pos.y
 
   canvas:push_matrix(a, b, c, d, e, f)
-  if self.draw ~= nil then
-    self:draw(canvas)
-  end
-  for _, shape in pairs(self.children) do
-    shape:draw_shape(canvas)
-  end
+
+  canvas:clip(function ()
+    for _, shape in pairs(self.clips) do
+      shape:draw_shape(canvas)
+    end
+  end, function ()
+    if self.draw ~= nil then
+      self:draw(canvas)
+    end
+    for _, shape in pairs(self.children) do
+      shape:draw_shape(canvas)
+    end
+  end)
+
   canvas:pop_matrix()
 end
 
@@ -116,6 +125,7 @@ function shapes.Shape.new(transform, value, metatable)
     transform = transform,
     value = value,
     children = {},
+    clips = {},
   }
 
   setmetatable(shape, metatable)
@@ -137,9 +147,24 @@ end
 
 ---@param self Shape
 ---@param child Shape
+function shapes.Shape:add_clip(child)
+  if child.parent ~= nil then
+	  child.parent:remove_child(child)
+  end
+
+  child.parent = self
+  self.clips[child.id] = child
+end
+
+---@param self Shape
+---@param child Shape
 function shapes.Shape:remove_child(child)
   if self.children[child.id] ~= nil then
     self.children[child.id] = nil
+    child.parent = nil
+  end
+  if self.clips[child.id] ~= nil then
+    self.clips[child.id] = nil
     child.parent = nil
   end
 end
@@ -346,7 +371,7 @@ function shapes.next_id()
 end
 
 ---@class Canvas
----@field play        fun(self, func: fun(canvas: Canvas): boolean)
+---@field clip        fun(self, clip: fun(canvas: Canvas), draw: fun(canvas: Canvas))
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
 ---@field draw_point  fun(self, x: number, y: number, radius: number)
 ---@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number, width: number)
@@ -354,7 +379,10 @@ end
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
 
----@param canvas Canvas
+---@class PlayCanvas : Canvas
+---@field play        fun(self, func: fun(canvas: Canvas): boolean)
+
+---@param canvas PlayCanvas
 ---@param func fun(scene: Scene, root: Shape)
 function shapes.play(canvas, func)
   local scene = luanim.Scene()
