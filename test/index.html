@@ -72,8 +72,15 @@
                     ctx.fillText(text, 0, 0)
                     ctx.restore()
                 },
+                draw_rect(x1, y1, x2, y2) {
+                    if (!clip) ctx.beginPath()
+                    ctx.rect(x1, y1, x2, y2)
+                    if (!clip) ctx.fill()
+                },
+                measure(text) {
+                    return ctx.measureText(text).width
+                },
                 clip_push() {
-                    console.log("start")
                     ctx.save()
                 },
                 clip_start() {
@@ -85,7 +92,6 @@
                     ctx.clip()
                 },
                 clip_pop() {
-                    console.log("end")
                     ctx.restore()
                 },
             })

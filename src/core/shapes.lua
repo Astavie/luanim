@@ -138,7 +138,7 @@ setmetatable(shapes.Shape, { __call = function(self, ...) return self.new(...) e
 ---@param child Shape
 function shapes.Shape:add_child(child)
   if child.parent ~= nil then
-	  child.parent:remove_child(child)
+	  child.parent:remove(child)
   end
 
   child.parent = self
@@ -149,7 +149,7 @@ end
 ---@param child Shape
 function shapes.Shape:add_clip(child)
   if child.parent ~= nil then
-	  child.parent:remove_child(child)
+	  child.parent:remove(child)
   end
 
   child.parent = self
@@ -158,7 +158,7 @@ end
 
 ---@param self Shape
 ---@param child Shape
-function shapes.Shape:remove_child(child)
+function shapes.Shape:remove(child)
   if self.children[child.id] ~= nil then
     self.children[child.id] = nil
     child.parent = nil
@@ -259,6 +259,7 @@ end
 ---@param max integer
 ---@param radius? number
 ---@return PointCloud
+---@nodiscard
 function shapes.PointCloud.new(point, min, max, radius)
   radius = radius or 1
 
@@ -281,10 +282,10 @@ end
 
 ---@class Line : Shape
 ---@field value LineValue
-shapes.Line         = shapes.newshape()
-shapes.Line.v1      = shapes.animator('v1')
-shapes.Line.v2      = shapes.animator('v2')
-shapes.Line.width   = shapes.animator('width')
+shapes.Line       = shapes.newshape()
+shapes.Line.v1    = shapes.animator('v1')
+shapes.Line.v2    = shapes.animator('v2')
+shapes.Line.width = shapes.animator('width')
 
 ---@param self Line
 ---@param canvas Canvas
@@ -297,6 +298,8 @@ end
 ---@param x2 number
 ---@param y2 number
 ---@param width? number
+---@return Line
+---@nodiscard
 function shapes.Line.new(x1, y1, x2, y2, width)
   local value = {
     v1 = vector.vec2(x1, y1),
@@ -305,6 +308,39 @@ function shapes.Line.new(x1, y1, x2, y2, width)
   }
 
   return shapes.Shape(nil, value, shapes.Line)
+end
+
+--- RECTANGLE ---
+
+---@class RectValue
+---@field v1 vec2
+---@field v2 vec2
+
+---@class Rect : Shape
+---@field value RectValue
+shapes.Rect    = shapes.newshape()
+shapes.Rect.v1 = shapes.animator('v1')
+shapes.Rect.v2 = shapes.animator('v2')
+
+---@param self Rect
+---@param canvas Canvas
+function shapes.Rect:draw(canvas)
+  canvas:draw_rect(self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
+end
+
+---@param x1 number
+---@param y1 number
+---@param x2 number
+---@param y2 number
+---@return Rect
+---@nodiscard
+function shapes.Rect.new(x1, y1, x2, y2)
+  local value = {
+    v1 = vector.vec2(x1, y1),
+    v2 = vector.vec2(x2, y2),
+  }
+
+  return shapes.Shape(nil, value, shapes.Rect)
 end
 
 --- POINTER ---
@@ -331,6 +367,8 @@ end
 
 ---@param shape Shape
 ---@param max? integer
+---@return Pointer
+---@nodiscard
 function shapes.Pointer.new(shape, max)
   max = max or 1
   return shapes.Shape(nil, { shape = shape, iterations = max, _iteration = 0 }, shapes.Pointer)
@@ -357,6 +395,8 @@ end
 ---@param y number
 ---@param text string
 ---@param size? number
+---@return Text
+---@nodiscard
 function shapes.Text.new(x, y, text, size)
   return shapes.Shape({ pos = vector.vec2(x, y) }, { text = text, size = size or 1 }, shapes.Text)
 end
@@ -371,18 +411,18 @@ function shapes.next_id()
 end
 
 ---@class Canvas
+---@field play        fun(self, func: fun(canvas: Canvas): boolean)
 ---@field clip        fun(self, clip: fun(canvas: Canvas), draw: fun(canvas: Canvas))
 ---@field draw_circle fun(self, x: number, y: number, radius: number)
+---@field draw_rect   fun(self, x1: number, y1: number, x2: number, y2: number)
 ---@field draw_point  fun(self, x: number, y: number, radius: number)
 ---@field draw_line   fun(self, x1: number, y1: number, x2: number, y2: number, width: number)
 ---@field draw_text   fun(self, x: number, y: number, size: number, text: string)
 ---@field push_matrix fun(self, a, b, c, d, e, f)
 ---@field pop_matrix  fun(self)
+---@field measure     fun(self, text: string): number
 
----@class PlayCanvas : Canvas
----@field play        fun(self, func: fun(canvas: Canvas): boolean)
-
----@param canvas PlayCanvas
+---@param canvas Canvas
 ---@param func fun(scene: Scene, root: Shape)
 function shapes.play(canvas, func)
   local scene = luanim.Scene()

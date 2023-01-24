@@ -30,6 +30,7 @@ typedef struct Shape {
     SHAPE_ELLIPSE = 1,
     SHAPE_BEZIER  = 2,
     SHAPE_TEXT    = 5,
+    SHAPE_RECT    = 10,
   } type;
   union {
     struct {
@@ -48,11 +49,16 @@ typedef struct Shape {
       double size;
       const char* text;
     } text;
+
+    struct {
+      Point start, end;
+    } rect;
   } value;
 } Shape;
 
 extern void canvas_frame();
 extern void canvas_draw(Shape* shapes);
+extern double canvas_measure(const char* text);
 
 #define SHAPES_COUNT 8196
 static Shape shapes_stack[SHAPES_COUNT];
@@ -212,11 +218,31 @@ static int canvas_draw_text(lua_State* L) {
   return 0;
 }
 
+static int canvas_draw_rect(lua_State* L) {
+  Point v1 = {
+    luaL_checknumber(L, 2),
+    luaL_checknumber(L, 3),
+  };
+  Point v2 = {
+    luaL_checknumber(L, 4),
+    luaL_checknumber(L, 5),
+  };
+  add_transform(*matrix_ptr);
+  add_shape((Shape) {SHAPE_RECT, {.rect = {v1, v2}}});
+  return 0;
+}
+
 static int canvas_pop_matrix(lua_State* L) {
   if (matrix_ptr > matrix_stack) {
     matrix_ptr -= 1;
   }
   return 0;
+}
+
+static int canvas_lua_measure(lua_State* L) {
+  const char* text = luaL_checkstring(L, 2);
+  lua_pushnumber(L, canvas_measure(text));
+  return 1;
 }
 
 static int canvas_clip(lua_State* L) {
@@ -265,6 +291,8 @@ static const struct luaL_Reg canvas[] = {
   {"draw_text",   canvas_draw_text},
   {"push_matrix", canvas_push_matrix},
   {"pop_matrix",  canvas_pop_matrix},
+  {"draw_rect",   canvas_draw_rect},
+  {"measure",     canvas_lua_measure},
   {NULL, NULL}
 };
 

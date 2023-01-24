@@ -2,6 +2,10 @@ mergeInto(LibraryManager.library, {
   canvas_frame: function() {
     Module.frame_start()
   },
+  canvas_measure: function(str) {
+    const text = Module.UTF8ToString(str)
+    return Module.measure(text)
+  },
   canvas_draw: function(ptr) {
     const SHAPE_END     = 0
     const SHAPE_ELLIPSE = 1
@@ -9,6 +13,7 @@ mergeInto(LibraryManager.library, {
     const SHAPE_CONFIG  = 3
     const SHAPE_MATRIX  = 4
     const SHAPE_TEXT    = 5
+    const SHAPE_RECT    = 10
 
     const SHAPE_CLIP_PUSH  = 6
     const SHAPE_CLIP_START = 7
@@ -67,6 +72,17 @@ mergeInto(LibraryManager.library, {
         const text = Module.UTF8ToString(str)
         Module.draw_text(xs, ys, siz, text)
         Module._free(str)
+        break
+      case SHAPE_RECT:
+        const x1r = Module.getValue(ptr, 'double'); ptr += 8
+        const y1r = Module.getValue(ptr, 'double'); ptr += 8
+        const x2r = Module.getValue(ptr, 'double'); ptr += 8
+        const y2r = Module.getValue(ptr, 'double'); ptr += 8
+                                                    ptr += 8
+                                                    ptr += 8
+                                                    ptr += 8
+                                                    ptr += 8
+        Module.draw_rect(x1r, y1r, x2r, y2r)
         break
       case SHAPE_CLIP_PUSH:
         ptr += 64
