@@ -321,6 +321,11 @@ static int open_canvas(lua_State* L) {
   return 1;
 }
 
+static int open_ir(lua_State* L) {
+  luaL_dostring(L, ir_lua);
+  return 1;
+}
+
 static void openlib(lua_State* L, const char* modname, lua_CFunction openf, int glb) {
   luaL_requiref(L, modname, openf, glb);
   lua_settop(L, -2);
@@ -328,6 +333,7 @@ static void openlib(lua_State* L, const char* modname, lua_CFunction openf, int 
 
 void luanim_openlibs(lua_State* L) {
   // core
+  openlib(L, "ir",     open_ir,     0);
   openlib(L, "luanim", open_luanim, 0);
   openlib(L, "tweens", open_tweens, 0);
   openlib(L, "vector", open_vector, 0);

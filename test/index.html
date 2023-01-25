@@ -109,6 +109,7 @@
                     const interval = setInterval(function() {
                         const resume = instance.advance()
                         if (!resume) {
+                            print(instance.peekstring())
                             clearInterval(interval)
                             resolve()
                         }

@@ -110,8 +110,18 @@ function luanim.advance_frame(scene, fps, prev_frame)
       end
 
       -- resume coroutine
-      local alive
-      alive, instr = coroutine.resume(scene.threads[id])
+      local ret = {coroutine.resume(scene.threads[id])}
+      local alive = ret[1]
+      instr = ret[2]
+
+      while alive and type(instr) == 'number' do
+        -- if we yielded an instruction, yield it back up the call stack
+        local resume = {coroutine.yield(select(2, table.unpack(ret)))}
+        ret = {coroutine.resume(scene.threads[id], table.unpack(resume))}
+        alive = ret[1]
+        instr = ret[2]
+      end
+
       scene.queued[id] = instr
 
       if not alive or instr == nil then
