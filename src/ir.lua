@@ -5,12 +5,16 @@ local ir = {}
 -- YIELD magic (type)
 ir.MAGIC  = 0;
 
+-- MAGIC shapes
+-- RESUME number (frames per second)
+ir.SHAPES = 0; -- video format '0'
+
 ---- CONTROL INSTRUCTIONS ----
 
 -- only used to get some information from the renderer while drawing
 -- when exporting to pure ir, these do not get exported
 
--- YIELD  string (text, font)
+-- YIELD  string (text, font?)
 -- RESUME number (width)
 ir.MEASURE = 14;
 
@@ -21,10 +25,6 @@ ir.EVENT   = 15;
 -------------------------
 -- Shapes video format --
 -------------------------
-
--- MAGIC shapes
--- RESUME number (frames per second)
-ir.SHAPES = 0; -- video format '0'
 
 -- the renderer provides its preferred fps in the MAGIC command
 -- luanim yields back its preferred fps (which may be slightly different!)
@@ -76,6 +76,9 @@ ir.LINE = 9;
 
 -- line back to start
 ir.PATH_CLOSE = 10;
+
+-- end path
+ir.PATH_END = 20;
 
 ---- SHAPES ----
 

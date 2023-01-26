@@ -39,15 +39,13 @@ local function scene1(scene, root)
   scene:terminate(co)
 end
 
-local co = coroutine.create(shapes.play)
-local instr = {coroutine.resume(co, scene1)}
+local co = shapes.start(scene1)
 
 -- instr should be magic, so we send the fps
-print(select(2, table.unpack(instr)))
-instr = {coroutine.resume(co, 30)}
+local instr = {co(30)}
 
 -- print the rest of the instructions
 while instr[1] do
   print(select(2, table.unpack(instr)))
-  instr = {coroutine.resume(co)}
+  instr = {co()}
 end

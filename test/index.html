@@ -10,22 +10,25 @@
     <p id="stdout"></p>
     <center><canvas id="canvas" width="1280" height="720" style="border:1px solid #000000;"></canvas>
     <br>
+    <input type="number" id="frames" value="60">
     <input id="button" type="button" value="play"></input></center>
     <br>
     <textarea id="script" style="width: 100%; height: 100vh;"></textarea>
     <script type="module">
-        import luanim from "./luanim.js"
+        import { LuaFactory } from "./wasmoon/index.js"
 
         const stdout = document.getElementById("stdout")
         const canvas = document.getElementById("canvas")
         const script = document.getElementById("script")
         const button = document.getElementById("button")
+        const frames = document.getElementById("frames")
         const ctx = canvas.getContext("2d")
 
         button.addEventListener('click', run)
 
         async function run() {
-            stdout.innerText = "";
+
+            stdout.innerText = ""
 
             const start = Date.now()
             const print = text => {
@@ -36,88 +39,169 @@
 
             let clip = false
 
-            const instance = await luanim({ 
-                print,
-                frame_start() {
-                    ctx.save()
-                    ctx.resetTransform()
-                    ctx.clearRect(0, 0, canvas.width, canvas.height)
-                    ctx.restore()
-                },
-                draw_ellipse(x, y, rx, ry, rot) {
-                    if (!clip) ctx.beginPath()
-                    ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
-                    if (!clip) ctx.fill()
-                },
-                draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2) {
-                    if (!clip) ctx.beginPath()
-                    ctx.moveTo(x1, y1)
-                    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x2, y2)
-                    if (!clip) ctx.stroke()
-                },
-                draw_config(lineWidth) {
-                    ctx.lineWidth = lineWidth
-                },
-                set_matrix(a, b, c, d, e, f) {
-                    ctx.resetTransform()
-                    ctx.translate(canvas.width / 2, canvas.height / 2)
-                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-                    ctx.transform(a, b, c, d, e, f)
-                },
-                draw_text(x, y, size, text) {
-                    if (clip) return // no support for text as clip path
-                    ctx.save()
-                    ctx.translate(x, y)
-                    ctx.scale(size, size)
-                    ctx.fillText(text, 0, 0)
-                    ctx.restore()
-                },
-                draw_rect(x1, y1, x2, y2) {
-                    if (!clip) ctx.beginPath()
-                    ctx.rect(x1, y1, x2, y2)
-                    if (!clip) ctx.fill()
-                },
-                measure(text) {
-                    return ctx.measureText(text).width
-                },
-                clip_push() {
-                    ctx.save()
-                },
-                clip_start() {
-                    ctx.beginPath()
-                    clip = true
-                },
-                clip_end() {
-                    clip = false
-                    ctx.clip()
-                },
-                clip_pop() {
-                    ctx.restore()
-                },
-            })
+            const factory = new LuaFactory("./wasmoon/glue.wasm")
+            await factory.mountFile("ir.lua", await (await fetch("./lua/ir.lua")).text())
+            await factory.mountFile("luanim.lua", await (await fetch("./lua/luanim.lua")).text())
+            await factory.mountFile("shapes.lua", await (await fetch("./lua/shapes.lua")).text())
+            await factory.mountFile("vector.lua", await (await fetch("./lua/vector.lua")).text())
+            await factory.mountFile("tweens.lua", await (await fetch("./lua/tweens.lua")).text())
+            const lua = await factory.createEngine()
 
-            if (!instance) {
-                print("could not start luanim")
-                return
-            }
+            const thread = lua.global.newThread()
+            const threadIndex = lua.global.getTop()
 
-            const ret = instance.load(script.value)
-            if (!ret) {
-                print(instance.peekstring())
-            } else {
-                await new Promise(resolve => {
-                    const interval = setInterval(function() {
-                        const resume = instance.advance()
-                        if (!resume) {
-                            print(instance.peekstring())
-                            clearInterval(interval)
-                            resolve()
+            try {
+                // open shapes.lua
+                thread.loadFile("shapes.lua")
+                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
+                thread.lua.lua_pushstring(thread.address, "start")
+                thread.lua.lua_gettable(thread.address, -2)
+
+                // open script
+                thread.loadString(script.value)
+                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
+
+                // call shapes.start function
+                thread.assertOk(thread.lua.lua_pcallk(thread.address, 1, -1, 0, 0, null))
+
+                // loop
+                let args = 1
+                let func = thread.lua.lua_gettop(thread.address)
+                thread.lua.lua_pushvalue(thread.address, -1)
+                thread.lua.lua_pushnumber(thread.address, frames.value)
+
+                const num = (i) => thread.lua.luaL_checknumber(thread.address, func + 1 + i)
+                const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i, null)
+                const pop = () => {
+                    thread.lua.lua_settop(thread.address, func)
+                    thread.lua.lua_pushvalue(thread.address, -1)
+                }
+
+                await new Promise(r => {
+                    let interval
+                    const frame = () => {
+                        ctx.save()
+                        ctx.resetTransform()
+                        ctx.clearRect(0, 0, canvas.width, canvas.height)
+                        ctx.restore()
+
+                        while (true) {
+                            thread.assertOk(thread.lua.lua_pcallk(thread.address, args, -1, 0, 0, null))
+                            
+                            if (thread.lua.lua_gettop(thread.address) == func) {
+                                // the end
+                                if (interval) clearInterval(interval)
+                                r()
+                                return
+                            }
+
+                            const instr = num(0)
+                            args = 0
+                            switch (instr) {
+                                case 1: // FRAME
+                                    // const frame = num(1)
+                                    // print("FRAME " + frame)
+                                    pop()
+                                    return
+                                case 16: // FPS
+                                    if (interval) clearInterval(interval)
+                                    interval = setInterval(frame, 1000 / num(1))
+                                    pop()
+                                    break
+                                case 2: // TRANSFORM
+                                    ctx.resetTransform()
+                                    ctx.translate(canvas.width / 2, canvas.height / 2)
+                                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                                    ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                                    pop()
+                                    break
+                                case 17: // IDENTITY
+                                    ctx.resetTransform()
+                                    ctx.translate(canvas.width / 2, canvas.height / 2)
+                                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                                    pop()
+                                    break
+                                case 19: // CIRCLE
+                                    ctx.beginPath()
+                                    ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
+                                    ctx.fill()
+                                    pop()
+                                    break
+                                default:
+                                    print(instr)
+                                    pop()
+                                    break
+                            }
                         }
-                    }, 16);
+                    }
+                    frame()
                 })
+            } finally {
+                lua.global.close()
+                lua.global.remove(threadIndex)
             }
 
-            instance.close()
+            // const instance = await luanim({ 
+            //     print,
+            //     frame_start() {
+            //         ctx.save()
+            //         ctx.resetTransform()
+            //         ctx.clearRect(0, 0, canvas.width, canvas.height)
+            //         ctx.restore()
+            //     },
+            //     draw_ellipse(x, y, rx, ry, rot) {
+            //         if (!clip) ctx.beginPath()
+            //         ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
+            //         if (!clip) ctx.fill()
+            //     },
+            //     path_start(x, y) {
+            //         if (!clip) ctx.beginPath()
+            //         ctx.moveTo(x1, y1)
+            //     },
+            //     draw_bezier(cx1, cy1, cx2, cy2, x, y) {
+            //         ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x, y)
+            //     },
+            //     path_end() {
+            //         if (!clip) ctx.stroke()
+            //     },
+            //     set_line_width(lineWidth) {
+            //         ctx.lineWidth = lineWidth
+            //     },
+            //     set_matrix(a, b, c, d, e, f) {
+            //         ctx.resetTransform()
+            //         ctx.translate(canvas.width / 2, canvas.height / 2)
+            //         ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+            //         ctx.transform(a, b, c, d, e, f)
+            //     },
+            //     draw_text(x, y, size, text) {
+            //         if (clip) return // no support for text as clip path
+            //         ctx.save()
+            //         ctx.translate(x, y)
+            //         ctx.scale(size, size)
+            //         ctx.fillText(text, 0, 0)
+            //         ctx.restore()
+            //     },
+            //     draw_rect(x1, y1, x2, y2) {
+            //         if (!clip) ctx.beginPath()
+            //         ctx.rect(x1, y1, x2, y2)
+            //         if (!clip) ctx.fill()
+            //     },
+            //     measure(text) {
+            //         return ctx.measureText(text).width
+            //     },
+            //     clip_start() {
+            //         ctx.save()
+            //         ctx.beginPath()
+            //         clip = true
+            //     },
+            //     clip_push() {
+            //         clip = false
+            //         ctx.clip()
+            //     },
+            //     clip_pop() {
+            //         ctx.restore()
+            //     },
+            // })
         }
     </script>
 </body>

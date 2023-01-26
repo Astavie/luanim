@@ -1,5 +1,4 @@
 local shapes = require 'shapes'
-local canvas = require 'canvas'
 local tweens = require 'tweens'
 local vector = require 'vector'
 
@@ -7698,4 +7697,4 @@ local function plot(scene, root)
   scene:play(cloud:scale(vector.vec2(0.0012), tweens.interp.log), 2)
 end
 
-shapes.play(canvas, plot)
+return plot

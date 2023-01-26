@@ -456,4 +456,11 @@ function shapes.play(func)
   end
 end
 
+---@param func fun(scene: Scene, root: Shape)
+function shapes.start(func)
+  local co = coroutine.wrap(shapes.play)
+  co(func)
+  return co
+end
+
 return shapes

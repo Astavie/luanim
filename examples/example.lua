@@ -1,6 +1,5 @@
 local shapes = require 'shapes'
 local vector = require 'vector'
-local canvas = require 'canvas'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
@@ -40,4 +39,4 @@ local function scene1(scene, root)
   scene:terminate(co)
 end
 
-shapes.play(canvas, scene1)
+return scene1
