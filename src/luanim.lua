@@ -1,3 +1,5 @@
+local ir = require 'ir'
+
 local luanim = {}
 
 ---@class Instruction
@@ -172,6 +174,40 @@ function luanim.play(...)
     scene:parallel(func)
     local frame = 0
     while luanim.advance_frame(scene, 60, frame) do frame = frame + 1 end
+  end
+end
+
+function luanim.log(f)
+  local log = ""
+  local function emit(...)
+    for i, x in ipairs({...}) do
+      if i == 1 then
+        for k, v in pairs(ir) do
+          if x == v then
+            log = log .. k
+            break
+          end
+        end
+      else
+        log = log .. " " .. x
+      end
+    end
+    log = log .. "\n"
+  end
+
+  local args = {}
+  while true do
+    local ret = {f(table.unpack(args))}
+    if not ret[1] then return log end
+
+    args = {}
+    if ret[1] == ir.MEASURE then
+      table.insert(args, 1) -- every measurement will just be 1
+    elseif ret[1] == ir.EMIT then
+      table.insert(args, emit)
+    else
+      emit(table.unpack(ret))
+    end
   end
 end
 

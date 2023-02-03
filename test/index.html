@@ -11,6 +11,7 @@
     <center><canvas id="canvas" width="1280" height="720" style="border:1px solid #000000;"></canvas>
     <br>
     <input type="number" id="frames" value="60">
+    <input type="number" id="speedo" value="1">
     <input id="button" type="button" value="play"></input></center>
     <br>
     <textarea id="script" style="width: 100%; height: 100vh;"></textarea>
@@ -22,6 +23,7 @@
         const script = document.getElementById("script")
         const button = document.getElementById("button")
         const frames = document.getElementById("frames")
+        const speedo = document.getElementById("speedo")
         const ctx = canvas.getContext("2d")
 
         button.addEventListener('click', run)
@@ -143,7 +145,7 @@
                 let args = 1
                 let func = thread.lua.lua_gettop(thread.address)
                 thread.lua.lua_pushvalue(thread.address, -2)
-                thread.lua.lua_pushnumber(thread.address, frames.value)
+                thread.lua.lua_pushnumber(thread.address, frames.value / speedo.value)
 
                 const num = (i) => thread.lua.luaL_checknumber (thread.address, func + 1 + i)
                 const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i)
@@ -191,7 +193,7 @@
                                     break
                                 case 16: // FPS
                                     if (interval) clearInterval(interval)
-                                    interval = setInterval(frame, 1000 / num(1))
+                                    interval = setInterval(frame, 1000 / num(1) / speedo.value)
                                     pop()
                                     break
                                 case 21: // EMIT

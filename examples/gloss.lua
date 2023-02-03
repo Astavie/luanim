@@ -8,7 +8,7 @@ end
 
 local function ease_inout_cubic(x)
   if x < 0.5 then
-    return 2 * x * x * x
+    return 4 * x * x * x
   else
     local y = -2 * x + 2
     return 1 - y * y * y / 2
