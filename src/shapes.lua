@@ -52,7 +52,7 @@ end
 ---@field package parent? Shape
 ---@field value any
 ---@field transform Transform
----@field protected draw? fun(self, matrix: mat3, emit: fun(...any)))
+---@field protected draw? fun(self, matrix: mat3, emit: fun(...)))
 shapes.Shape = {}
 shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
 shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
@@ -81,7 +81,7 @@ end
 
 ---@param self Shape
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 ---@param ignore_clips? boolean
 function shapes.Shape:draw_shape(matrix, emit, ignore_clips)
   local cos = math.cos(self.transform.angle)
@@ -204,7 +204,7 @@ shapes.Circle.radius  = shapes.animator('radius')
 
 ---@param self Circle
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Circle:draw(matrix, emit)
   emit(ir.TRANSFORM, matrix:unpack())
   emit(ir.CIRCLE, 0, 0, self.value.radius)
@@ -228,7 +228,7 @@ shapes.Point.radius  = shapes.animator('radius')
 
 ---@param self Point
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Point:draw(matrix, emit)
   local pos = matrix * self.transform.pos
   emit(ir.IDENTITY)
@@ -251,27 +251,45 @@ end
 ---@field radius number
 ---@field min integer
 ---@field max integer
+---@field lineMin number
+---@field lineMax number
 ---@field point fun(n: integer): number, number
 
 ---@class PointCloud : Shape
 ---@field value PointCloudValue
-shapes.PointCloud        = shapes.newshape()
-shapes.PointCloud.radius = shapes.animator('radius')
-shapes.PointCloud.min    = shapes.animator('min', tweens.interp.integer)
-shapes.PointCloud.max    = shapes.animator('max', tweens.interp.integer)
+shapes.PointCloud         = shapes.newshape()
+shapes.PointCloud.radius  = shapes.animator('radius')
+shapes.PointCloud.min     = shapes.animator('min', tweens.interp.integer)
+shapes.PointCloud.max     = shapes.animator('max', tweens.interp.integer)
+shapes.PointCloud.lineMin = shapes.animator('lineMin', tweens.interp.linear)
+shapes.PointCloud.lineMax = shapes.animator('lineMax', tweens.interp.linear)
 
 ---@param self PointCloud
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.PointCloud:draw(matrix, emit)
   emit(ir.IDENTITY)
 
   -- calculate the matrix transform by hand because this needs to be FAST
   local a, b, c, d, e, f = matrix:unpack()
 
+  local lastx, lasty
   for i = self.value.min, self.value.max do
     local x, y = self.value.point(i)
-    emit(ir.CIRCLE, a * x + c * y + e, b * x + d * y + f, self.value.radius)
+    x, y = a * x + c * y + e, b * x + d * y + f
+
+    emit(ir.CIRCLE, x, y, self.value.radius)
+    if self.value.lineMin < i and self.value.lineMax > i - 1 then
+      local p1, p2 = 0, 1
+      if self.value.lineMin > i - 1 then p1 = self.value.lineMin - i + 1 end
+      if self.value.lineMax < i     then p2 = self.value.lineMax - i + 1 end
+
+      emit(ir.PATH_START, p1 * x + (1 - p1) * lastx, p1 * y + (1 - p1) * lasty)
+      emit(ir.LINE, p2 * x + (1 - p2) * lastx, p2 * y + (1 - p2) * lasty)
+      emit(ir.PATH_END)
+    end
+
+    lastx, lasty = x, y
   end
 end
 
@@ -288,7 +306,9 @@ function shapes.PointCloud.new(point, min, max, radius)
     point = point,
     min = min,
     max = max,
-    radius = radius
+    radius = radius,
+    lineMin = min,
+    lineMax = min,
   }
 
   return shapes.Shape(nil, value, shapes.PointCloud)
@@ -310,7 +330,7 @@ shapes.Line.width = shapes.animator('width')
 
 ---@param self Line
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Line:draw(matrix, emit)
   local p1 = matrix * self.value.v1
   local p2 = matrix * self.value.v2
@@ -351,7 +371,7 @@ shapes.Rect.v2 = shapes.animator('v2')
 
 ---@param self Rect
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Rect:draw(matrix, emit)
   emit(ir.TRANSFORM, matrix:unpack())
   emit(ir.RECT, self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
@@ -386,7 +406,7 @@ shapes.Pointer.iterations = shapes.animator('iterations', tweens.interp.integer)
 
 ---@param self Pointer
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Pointer:draw(matrix, emit)
   if self.value._iteration == self.value.iterations then return end
 
@@ -417,7 +437,7 @@ shapes.Text.size = shapes.animator('size')
 
 ---@param self Text
 ---@param matrix mat3
----@param emit fun(...any)
+---@param emit fun(...)
 function shapes.Text:draw(matrix, emit)
   matrix = matrix * vector.mat3(self.value.size, 0, 0, self.value.size, 0, 0)
   emit(ir.TRANSFORM, matrix:unpack())

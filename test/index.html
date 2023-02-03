@@ -38,6 +38,7 @@
             }
 
             let clip = false
+            let lastx, lasty
 
             const factory = new LuaFactory("./wasmoon/glue.wasm")
             await factory.mountFile("ir.lua", await (await fetch("./lua/ir.lua")).text())
@@ -86,7 +87,22 @@
                         case 6: // CLIP POP
                             ctx.restore()
                             break
-                        case 11:
+                        case 7: // PATH START
+                            if (!clip) ctx.beginPath()
+                            lastx = num(1)
+                            lasty = num(2)
+                            ctx.moveTo(lastx, lasty)
+                            break
+                        case 9: // LINE
+                            ctx.lineTo(num(1), num(2))
+                            break
+                        case 10: // CLOSE PATH
+                            ctx.lineTo(lastx, lasty)
+                            break
+                        case 20: // END PATH
+                            if (!clip) ctx.stroke()
+                            break
+                        case 11: // RECTANGLE
                             if (!clip) ctx.beginPath()
                             ctx.rect(num(1), num(2), num(3), num(4))
                             if (!clip) ctx.fill()
