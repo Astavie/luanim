@@ -48,4 +48,4 @@ local function tree_anim(scene, root)
   scene:play(text:size(0), 1)
 end
 
-return tree_anim
+return shapes.start(tree_anim)

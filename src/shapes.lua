@@ -52,7 +52,7 @@ end
 ---@field package parent? Shape
 ---@field value any
 ---@field transform Transform
----@field protected draw? fun(self, matrix: mat3)
+---@field protected draw? fun(self, matrix: mat3, emit: fun(...any)))
 shapes.Shape = {}
 shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
 shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
@@ -81,8 +81,9 @@ end
 
 ---@param self Shape
 ---@param matrix mat3
+---@param emit fun(...any)
 ---@param ignore_clips? boolean
-function shapes.Shape:draw_shape(matrix, ignore_clips)
+function shapes.Shape:draw_shape(matrix, emit, ignore_clips)
   local cos = math.cos(self.transform.angle)
   local sin = math.sin(self.transform.angle)
 
@@ -98,22 +99,22 @@ function shapes.Shape:draw_shape(matrix, ignore_clips)
   local clips = not ignore_clips and next(self.clips) ~= nil
 
   if clips then
-    coroutine.yield(ir.CLIP_START)
+    emit(ir.CLIP_START)
     for _, shape in pairs(self.clips) do
-      shape:draw_shape(matrix, true)
+      shape:draw_shape(matrix, emit, true)
     end
-    coroutine.yield(ir.CLIP_PUSH)
+    emit(ir.CLIP_PUSH)
   end
 
   if self.draw ~= nil then
-    self:draw(matrix)
+    self:draw(matrix, emit)
   end
   for _, shape in pairs(self.children) do
-    shape:draw_shape(matrix)
+    shape:draw_shape(matrix, emit)
   end
 
   if clips then
-    coroutine.yield(ir.CLIP_POP)
+    emit(ir.CLIP_POP)
   end
 end
 
@@ -203,9 +204,10 @@ shapes.Circle.radius  = shapes.animator('radius')
 
 ---@param self Circle
 ---@param matrix mat3
-function shapes.Circle:draw(matrix)
-  coroutine.yield(ir.TRANSFORM, matrix:unpack())
-  coroutine.yield(ir.CIRCLE, 0, 0, self.value.radius)
+---@param emit fun(...any)
+function shapes.Circle:draw(matrix, emit)
+  emit(ir.TRANSFORM, matrix:unpack())
+  emit(ir.CIRCLE, 0, 0, self.value.radius)
 end
 
 ---@param x number
@@ -226,10 +228,11 @@ shapes.Point.radius  = shapes.animator('radius')
 
 ---@param self Point
 ---@param matrix mat3
-function shapes.Point:draw(matrix)
+---@param emit fun(...any)
+function shapes.Point:draw(matrix, emit)
   local pos = matrix * self.transform.pos
-  coroutine.yield(ir.IDENTITY)
-  coroutine.yield(ir.CIRCLE, pos.x, pos.y, self.value.radius)
+  emit(ir.IDENTITY)
+  emit(ir.CIRCLE, pos.x, pos.y, self.value.radius)
 end
 
 ---@param x number
@@ -259,12 +262,16 @@ shapes.PointCloud.max    = shapes.animator('max', tweens.interp.integer)
 
 ---@param self PointCloud
 ---@param matrix mat3
-function shapes.PointCloud:draw(matrix)
-  coroutine.yield(ir.IDENTITY)
+---@param emit fun(...any)
+function shapes.PointCloud:draw(matrix, emit)
+  emit(ir.IDENTITY)
+
+  -- calculate the matrix transform by hand because this needs to be FAST
+  local a, b, c, d, e, f = matrix:unpack()
+
   for i = self.value.min, self.value.max do
     local x, y = self.value.point(i)
-    local pos = matrix * vector.vec2(x, y)
-    coroutine.yield(ir.CIRCLE, pos.x, pos.y, self.value.radius)
+    emit(ir.CIRCLE, a * x + c * y + e, b * x + d * y + f, self.value.radius)
   end
 end
 
@@ -303,13 +310,14 @@ shapes.Line.width = shapes.animator('width')
 
 ---@param self Line
 ---@param matrix mat3
-function shapes.Line:draw(matrix)
+---@param emit fun(...any)
+function shapes.Line:draw(matrix, emit)
   local p1 = matrix * self.value.v1
   local p2 = matrix * self.value.v2
-  coroutine.yield(ir.LINE_WIDTH, self.value.width)
-  coroutine.yield(ir.IDENTITY)
-  coroutine.yield(ir.PATH_START, p1.x, p1.y)
-  coroutine.yield(ir.LINE, p2.x, p2.y)
+  emit(ir.LINE_WIDTH, self.value.width)
+  emit(ir.IDENTITY)
+  emit(ir.PATH_START, p1.x, p1.y)
+  emit(ir.LINE, p2.x, p2.y)
 end
 
 ---@param x1 number
@@ -343,9 +351,10 @@ shapes.Rect.v2 = shapes.animator('v2')
 
 ---@param self Rect
 ---@param matrix mat3
-function shapes.Rect:draw(matrix)
-  coroutine.yield(ir.TRANSFORM, matrix:unpack())
-  coroutine.yield(ir.RECT, self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
+---@param emit fun(...any)
+function shapes.Rect:draw(matrix, emit)
+  emit(ir.TRANSFORM, matrix:unpack())
+  emit(ir.RECT, self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
 end
 
 ---@param x1 number
@@ -377,11 +386,12 @@ shapes.Pointer.iterations = shapes.animator('iterations', tweens.interp.integer)
 
 ---@param self Pointer
 ---@param matrix mat3
-function shapes.Pointer:draw(matrix)
+---@param emit fun(...any)
+function shapes.Pointer:draw(matrix, emit)
   if self.value._iteration == self.value.iterations then return end
 
   self.value._iteration = self.value._iteration + 1
-  self.value.shape:draw_shape(matrix)
+  self.value.shape:draw_shape(matrix, emit)
   self.value._iteration = self.value._iteration - 1
 end
 
@@ -407,10 +417,11 @@ shapes.Text.size = shapes.animator('size')
 
 ---@param self Text
 ---@param matrix mat3
-function shapes.Text:draw(matrix)
+---@param emit fun(...any)
+function shapes.Text:draw(matrix, emit)
   matrix = matrix * vector.mat3(self.value.size, 0, 0, self.value.size, 0, 0)
-  coroutine.yield(ir.TRANSFORM, matrix:unpack())
-  coroutine.yield(ir.TEXT, 0, 0, self.value.text)
+  emit(ir.TRANSFORM, matrix:unpack())
+  emit(ir.TEXT, 0, 0, self.value.text)
 end
 
 ---@param x number
@@ -445,7 +456,8 @@ function shapes.play(func)
   while true do
     local skip = coroutine.yield(ir.FRAME, frame)
     if not skip then
-      root:draw_shape(vector.mat3.identity)
+      local fun = coroutine.yield(ir.EMIT)
+      root:draw_shape(vector.mat3.identity, fun)
     end
 
     if not luanim.advance_frame(scene, fps, frame) then

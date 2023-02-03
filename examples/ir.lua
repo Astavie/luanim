@@ -49,3 +49,5 @@ while instr[1] do
   print(select(2, table.unpack(instr)))
   instr = {co()}
 end
+
+return function() end

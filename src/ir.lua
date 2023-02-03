@@ -20,7 +20,10 @@ ir.MEASURE = 14;
 
 -- YIELD  string (name)
 -- RESUME number (duration)
-ir.EVENT   = 15;
+ir.EVENT = 15;
+
+-- RESUME function (ir emitter)
+ir.EMIT = 21;
 
 -------------------------
 -- Shapes video format --

@@ -39,4 +39,4 @@ local function scene1(scene, root)
   scene:terminate(co)
 end
 
-return scene1
+return shapes.start(scene1)

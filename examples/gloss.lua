@@ -120,4 +120,4 @@ local function text_anim(scene, root)
   scene:parallel(appear, translation, vec(1, 0), 0.05, delay + 0.5)
 end
 
-return text_anim
+return shapes.start(text_anim)

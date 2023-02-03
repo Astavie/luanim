@@ -2,8 +2,8 @@ WASMDIR = ./wasm/
 
 all: wasm
 
-./wasmoon/dist/index.js:
-	cd wasmoon && npm i && bash ./build.sh dev && npm run build && npm test
+./wasmoon/dist/index.js: ./lib/
+	./build.sh
 
 wasm: ./src/ ./wasmoon/dist/index.js
 	mkdir -p ${WASMDIR}

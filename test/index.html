@@ -50,19 +50,54 @@
             const thread = lua.global.newThread()
             const threadIndex = lua.global.getTop()
 
-            try {
-                // open shapes.lua
-                thread.loadFile("shapes.lua")
-                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
-                thread.lua.lua_pushstring(thread.address, "start")
-                thread.lua.lua_gettable(thread.address, -2)
+            const draw = (buffer, size) => {
+                let index = 0
+                while (index < size) {
+                    const old = index
+                    const num = (i) => {
+                        if (index < old + i + 1) index = old + i + 1
+                        return thread.lua.module.getValue(buffer + (i + old) * 8, 'double')
+                    }
+                    const str = (i) => {
+                        if (index < old + i + 1) index = old + i + 1
+                        const ptr = thread.lua.module.getValue(buffer + (i + old) * 8, 'i8*')
+                        const s = thread.lua.module.UTF8ToString(ptr)
+                        thread.lua.module._free(ptr)
+                        return s
+                    }
 
+                    const instr = num(0)
+                    switch (instr) {
+                        case 2: // TRANSFORM
+                            ctx.resetTransform()
+                            ctx.translate(canvas.width / 2, canvas.height / 2)
+                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                            ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                            break
+                        case 17: // IDENTITY
+                            ctx.resetTransform()
+                            ctx.translate(canvas.width / 2, canvas.height / 2)
+                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                            break
+                        case 19: // CIRCLE
+                            ctx.beginPath()
+                            ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
+                            ctx.fill()
+                            break
+                        default:
+                            print("UNKNOWN " + instr)
+                            break
+                    }
+                }
+            }
+
+            const fpDraw = thread.lua.module.addFunction(draw, 'vii')
+            const fpEmit = thread.lua.module._luanim_emitter(fpDraw)
+
+            try {
                 // open script
                 thread.loadString(script.value)
                 thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
-
-                // call shapes.start function
-                thread.assertOk(thread.lua.lua_pcallk(thread.address, 1, -1, 0, 0, null))
 
                 // loop
                 let args = 1
@@ -71,7 +106,6 @@
                 thread.lua.lua_pushnumber(thread.address, frames.value)
 
                 const num = (i) => thread.lua.luaL_checknumber(thread.address, func + 1 + i)
-                const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i, null)
                 const pop = () => {
                     thread.lua.lua_settop(thread.address, func)
                     thread.lua.lua_pushvalue(thread.address, -1)
@@ -87,48 +121,38 @@
 
                         while (true) {
                             thread.assertOk(thread.lua.lua_pcallk(thread.address, args, -1, 0, 0, null))
-                            
+
                             if (thread.lua.lua_gettop(thread.address) == func) {
                                 // the end
                                 if (interval) clearInterval(interval)
+                                thread.lua.module._luanim_draw()
+
                                 r()
                                 return
                             }
 
                             const instr = num(0)
                             args = 0
+
                             switch (instr) {
                                 case 1: // FRAME
                                     // const frame = num(1)
                                     // print("FRAME " + frame)
                                     pop()
+                                    thread.lua.module._luanim_draw()
                                     return
                                 case 16: // FPS
                                     if (interval) clearInterval(interval)
                                     interval = setInterval(frame, 1000 / num(1))
                                     pop()
                                     break
-                                case 2: // TRANSFORM
-                                    ctx.resetTransform()
-                                    ctx.translate(canvas.width / 2, canvas.height / 2)
-                                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-                                    ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                                case 21: // EMIT
                                     pop()
-                                    break
-                                case 17: // IDENTITY
-                                    ctx.resetTransform()
-                                    ctx.translate(canvas.width / 2, canvas.height / 2)
-                                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-                                    pop()
-                                    break
-                                case 19: // CIRCLE
-                                    ctx.beginPath()
-                                    ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
-                                    ctx.fill()
-                                    pop()
+                                    thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
+                                    args = 1
                                     break
                                 default:
-                                    print(instr)
+                                    emit(thread.address, func + 1)
                                     pop()
                                     break
                             }
@@ -137,6 +161,7 @@
                     frame()
                 })
             } finally {
+                thread.lua.module.removeFunction(fpEmit)
                 lua.global.close()
                 lua.global.remove(threadIndex)
             }

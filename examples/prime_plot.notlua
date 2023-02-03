@@ -7697,4 +7697,4 @@ local function plot(scene, root)
   scene:play(cloud:scale(vector.vec2(0.0012), tweens.interp.log), 2)
 end
 
-return plot
+return shapes.start(plot)

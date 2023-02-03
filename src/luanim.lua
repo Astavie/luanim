@@ -94,10 +94,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
   local time = prev_frame * frame_time
   local next = (prev_frame + 1) * frame_time
 
-  local has_entries = false
   for id, instr in pairs(scene.queued) do
-    has_entries = true
-
     scene.time = time
 
     -- resume while finished
@@ -152,7 +149,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
   end
   scene.to_remove = {}
 
-  return has_entries
+  return _G.next(scene.queued) ~= nil
 end
 
 ---@param ... fun(scene: Scene)
