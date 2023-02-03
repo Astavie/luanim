@@ -1,11 +1,11 @@
 local shapes = require 'shapes'
-local vector = require 'vector'
+local vec2   = require 'vector'.vec2
 
 -- circle that keeps growing and shrinking
-local function flash(scene, object)
+local function flash(_, object)
   while true do
-    scene:play(object:radius(80),  0.5)
-    scene:play(object:radius(120), 0.5)
+    object.radius( 80, 0.5)
+    object.radius(120, 0.5)
   end
 end
 
@@ -17,8 +17,8 @@ local function scene1(scene, root)
   local circle = shapes.Circle(0, 0, 120)
 
   root:add_child(circle)
-  scene:play(circle:pos(vector.vec2(-120, 0))) -- 'circle.value.pos.x = -120' should also work
-  scene:play(circle:pos(vector.vec2( 120, 0)), 1)
+  circle.pos(vec2(-120, 0))
+  circle.pos(vec2( 120, 0), 1)
 
   -- grow and shrink circle indefinitely
   local co = scene:parallel(flash, circle)
@@ -29,8 +29,9 @@ local function scene1(scene, root)
   local orbit = function (p)
     -- you're not allowed to use most scene methods here
     -- this is because the function won't be executed inside the coroutine
-    circle.transform.pos.x = math.cos(p * 2 * math.pi) * 120
-    circle.transform.pos.y = math.sin(p * 2 * math.pi) * 120
+    local x = math.cos(p * 2 * math.pi) * 120
+    local y = math.sin(p * 2 * math.pi) * 120
+    circle.pos(vec2(x, y))
   end
 
   scene:play(orbit, 5)

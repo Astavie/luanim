@@ -1,6 +1,6 @@
 local shapes = require 'shapes'
 local tweens = require 'tweens'
-local vector = require 'vector'
+local vec2   = require 'vector'.vec2
 
 local primes = { 2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
 103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,
@@ -7679,22 +7679,22 @@ end
 
 local function plot(scene, root)
   local cloud = shapes.PointCloud(plot_num, 1, 5000, 2)
-  cloud.transform.scale = vector.vec2(100)
+  cloud.scale(vec2(100))
 
   root:add_child(cloud)
 
   -- zoom out
-  scene:play(cloud:scale(vector.vec2(0.012), tweens.interp.log), 5)
+  cloud.scale(vec2(0.012), 5, nil, tweens.interp.log)
 
   -- make points smaller
-  scene:play(cloud:radius(0.5), 1)
+  cloud.radius(0.5, 1)
 
   -- remove first 2500 primes
-  scene:play(cloud:min(2500), 2)
+  cloud.min(2500, 2)
 
   -- zoom out even more
-  cloud.value.max = 25000
-  scene:play(cloud:scale(vector.vec2(0.0012), tweens.interp.log), 2)
+  cloud.max(25000)
+  cloud.scale(vec2(0.0012), 2, nil, tweens.interp.log)
 end
 
 return shapes.start(plot)

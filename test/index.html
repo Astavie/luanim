@@ -28,7 +28,14 @@
 
         button.addEventListener('click', run)
 
+        let interval, resolve
+
         async function run() {
+
+            if (interval) {
+                clearInterval(interval)
+                resolve()
+            }
 
             stdout.innerText = ""
 
@@ -155,7 +162,7 @@
                 }
 
                 await new Promise(r => {
-                    let interval
+                    resolve = r
                     const frame = () => {
                         ctx.save()
                         ctx.resetTransform()
@@ -168,9 +175,9 @@
                             if (thread.lua.lua_gettop(thread.address) == func) {
                                 // the end
                                 if (interval) clearInterval(interval)
+                                interval = undefined
                                 thread.lua.module._luanim_draw()
-
-                                r()
+                                resolve()
                                 return
                             }
 
@@ -179,9 +186,12 @@
                             args = 0
 
                             switch (instr) {
+                                case 0: // MAGIC
+                                    pop()
+                                    thread.lua.lua_pushnumber(thread.address, frames.value / speedo.value)
+                                    args = 1
+                                    break
                                 case 1: // FRAME
-                                    // const frame = num(1)
-                                    // print("FRAME " + frame)
                                     pop()
                                     thread.lua.module._luanim_draw()
                                     return

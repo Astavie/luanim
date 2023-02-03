@@ -2,75 +2,30 @@ local luanim = require 'luanim'
 local tweens = require 'tweens'
 local vector = require 'vector'
 
+local vec2 = vector.vec2
+local mat3 = vector.mat3
+
 local ir = require 'ir'
 
 local shapes = {}
 local global_id = 0
 
-local function animator2(key, interp, sub)
-  sub = sub or 'value'
-  return function(self, from, to, interp2)
-    -- get interpolation function
-    if interp2 == nil then
-      if type(to) == "function" then
-        interp2 = to
-      else
-        interp2 = interp
-      end
-    end
-    -- get from, to
-    if to == nil or type(to) == "function" then
-      to = from
-      from = self[sub][key]
-    end
-    -- return animation
-    return function(p)
-      self[sub][key] = interp2(from, to, p)
-    end
-  end
-end
-
----@param key string
----@param interp? fun(a, b, p: number): any
----@param sub? string
----@return fun(self, a, b?, c?): animation
-function shapes.animator(key, interp, sub)
-  return animator2(key, interp or tweens.interp.linear, sub)
-end
-
 --- SHAPE ---
-
----@class Transform
----@field pos vec2
----@field angle number
----@field scale vec2
 
 ---@class Shape
 ---@field package id id
 ---@field package children table<id, Shape>
 ---@field package clips    table<id, Shape>
 ---@field package parent? Shape
----@field value any
----@field transform Transform
+---
+---@field pos       signal<vec2>
+---@field angle     signal<number>
+---@field scale     signal<vec2>
+---@field transform signal<mat3>
+---
 ---@field protected draw? fun(self, matrix: mat3, emit: fun(...)))
 shapes.Shape = {}
-shapes.Shape.pos = shapes.animator('pos', nil, 'transform')
-shapes.Shape.angle = shapes.animator('angle', nil, 'transform')
-shapes.Shape.scale = shapes.animator('scale', nil, 'transform')
-
-function shapes.Shape:__index(key)
-  if key == 'value' then
-    return {}
-  end
-
-  if shapes.Shape[key] ~= nil then
-    return shapes.Shape[key]
-  end
-
-  if self.value[key] ~= nil then
-    return animator2(key)
-  end
-end
+shapes.Shape.__index = shapes.Shape
 
 ---@param self Shape
 ---@param max? integer
@@ -84,17 +39,7 @@ end
 ---@param emit fun(...)
 ---@param ignore_clips? boolean
 function shapes.Shape:draw_shape(matrix, emit, ignore_clips)
-  local cos = math.cos(self.transform.angle)
-  local sin = math.sin(self.transform.angle)
-
-  local a =  cos * self.transform.scale.x
-  local b =  sin * self.transform.scale.x
-  local c = -sin * self.transform.scale.y
-  local d =  cos * self.transform.scale.y
-  local e = self.transform.pos.x
-  local f = self.transform.pos.y
-
-  matrix = matrix * vector.mat3(a, b, c, d, e, f)
+  matrix = matrix * self.transform()
 
   local clips = not ignore_clips and next(self.clips) ~= nil
 
@@ -118,25 +63,40 @@ function shapes.Shape:draw_shape(matrix, emit, ignore_clips)
   end
 end
 
----@param transform? Transform
----@param value? any
+---@param pos? vec2
+---@param value? table
 ---@param metatable? table
 ---@return any
 ---@nodiscard
-function shapes.Shape.new(transform, value, metatable)
+function shapes.Shape.new(pos, value, metatable)
   metatable = metatable or shapes.Shape
-  transform = transform or {}
-  transform.pos = transform.pos or vector.vec2(0, 0)
-  transform.angle = transform.angle or 0
-  transform.scale = transform.scale or vector.vec2(1, 1)
 
   local shape = {
     id = shapes.next_id(),
-    transform = transform,
-    value = value,
+    pos = luanim.signal(pos or vec2(0, 0)),
+    angle = luanim.signal(0),
+    scale = luanim.signal(vec2(1, 1)),
     children = {},
     clips = {},
   }
+
+  shape.transform = luanim.signal(function()
+    local cos = math.cos(shape.angle())
+    local sin = math.sin(shape.angle())
+
+    local a =  cos * shape.scale().x
+    local b =  sin * shape.scale().x
+    local c = -sin * shape.scale().y
+    local d =  cos * shape.scale().y
+    local e = shape.pos().x
+    local f = shape.pos().y
+
+    return mat3(a, b, c, d, e, f)
+  end)
+
+  for k, v in pairs(value or {}) do
+    shape[k] = v
+  end
 
   setmetatable(shape, metatable)
   return shape
@@ -187,27 +147,23 @@ function shapes.newshape()
     if shape[key] ~= nil then
       return shape[key]
     end
-    return shapes.Shape.__index(self, key)
+    return shapes.Shape[key]
   end
   return shape
 end
 
 --- CIRCLE ---
 
----@class CircleValue
----@field radius number
-
 ---@class Circle : Shape
----@field value CircleValue
-shapes.Circle         = shapes.newshape()
-shapes.Circle.radius  = shapes.animator('radius')
+---@field radius signal<number>
+shapes.Circle = shapes.newshape()
 
 ---@param self Circle
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Circle:draw(matrix, emit)
   emit(ir.TRANSFORM, matrix:unpack())
-  emit(ir.CIRCLE, 0, 0, self.value.radius)
+  emit(ir.CIRCLE, 0, 0, self.radius())
 end
 
 ---@param x number
@@ -216,23 +172,22 @@ end
 ---@return Circle
 ---@nodiscard
 function shapes.Circle.new(x, y, radius)
-  return shapes.Shape({ pos = vector.vec2(x, y) }, { radius = radius }, shapes.Circle)
+  return shapes.Shape(vec2(x, y), { radius = luanim.signal(radius) }, shapes.Circle)
 end
 
 --- POINT (circle that doesn't scale) ---
 
 ---@class Point : Shape
----@field value CircleValue
-shapes.Point         = shapes.newshape()
-shapes.Point.radius  = shapes.animator('radius')
+---@field radius signal<number>
+shapes.Point = shapes.newshape()
 
 ---@param self Point
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Point:draw(matrix, emit)
-  local pos = matrix * self.transform.pos
+  local pos = matrix * self.pos()
   emit(ir.IDENTITY)
-  emit(ir.CIRCLE, pos.x, pos.y, self.value.radius)
+  emit(ir.CIRCLE, pos.x, pos.y, self.radius())
 end
 
 ---@param x number
@@ -242,47 +197,44 @@ end
 ---@nodiscard
 function shapes.Point.new(x, y, radius)
   radius = radius or 1
-  return shapes.Shape({ pos = vector.vec2(x, y) }, { radius = radius }, shapes.Point)
+  return shapes.Shape(vec2(x, y), { radius = luanim.signal(radius) }, shapes.Point)
 end
 
 --- POINT CLOUD ---
 
----@class PointCloudValue
----@field radius number
----@field min integer
----@field max integer
----@field lineMin number
----@field lineMax number
----@field point fun(n: integer): number, number
-
 ---@class PointCloud : Shape
----@field value PointCloudValue
-shapes.PointCloud         = shapes.newshape()
-shapes.PointCloud.radius  = shapes.animator('radius')
-shapes.PointCloud.min     = shapes.animator('min', tweens.interp.integer)
-shapes.PointCloud.max     = shapes.animator('max', tweens.interp.integer)
-shapes.PointCloud.lineMin = shapes.animator('lineMin', tweens.interp.linear)
-shapes.PointCloud.lineMax = shapes.animator('lineMax', tweens.interp.linear)
+---@field radius    signal<number>
+---@field min       signal<integer>
+---@field max       signal<integer>
+---@field lineMin   signal<number>
+---@field lineMax   signal<number>
+---@field lineWidth signal<number>
+---@field point fun(n: integer): number, number
+shapes.PointCloud = shapes.newshape()
 
 ---@param self PointCloud
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.PointCloud:draw(matrix, emit)
+  emit(ir.LINE_WIDTH, self.lineWidth())
   emit(ir.IDENTITY)
 
   -- calculate the matrix transform by hand because this needs to be FAST
   local a, b, c, d, e, f = matrix:unpack()
+  local radius = self.radius()
+  local lineMin = self.lineMin()
+  local lineMax = self.lineMax()
 
   local lastx, lasty
-  for i = self.value.min, self.value.max do
-    local x, y = self.value.point(i)
+  for i = self.min(), self.max() do
+    local x, y = self.point(i)
     x, y = a * x + c * y + e, b * x + d * y + f
 
-    emit(ir.CIRCLE, x, y, self.value.radius)
-    if self.value.lineMin < i and self.value.lineMax > i - 1 then
+    emit(ir.CIRCLE, x, y, radius)
+    if lineMin < i and lineMax > i - 1 then
       local p1, p2 = 0, 1
-      if self.value.lineMin > i - 1 then p1 = self.value.lineMin - i + 1 end
-      if self.value.lineMax < i     then p2 = self.value.lineMax - i + 1 end
+      if lineMin > i - 1 then p1 = lineMin - i + 1 end
+      if lineMax < i     then p2 = lineMax - i + 1 end
 
       emit(ir.PATH_START, p1 * x + (1 - p1) * lastx, p1 * y + (1 - p1) * lasty)
       emit(ir.LINE, p2 * x + (1 - p2) * lastx, p2 * y + (1 - p2) * lasty)
@@ -304,11 +256,12 @@ function shapes.PointCloud.new(point, min, max, radius)
 
   local value = {
     point = point,
-    min = min,
-    max = max,
-    radius = radius,
-    lineMin = min,
-    lineMax = min,
+    min = luanim.signal(min, tweens.interp.integer),
+    max = luanim.signal(max, tweens.interp.integer),
+    radius = luanim.signal(radius),
+    lineMin = luanim.signal(min),
+    lineMax = luanim.signal(min),
+    lineWidth = luanim.signal(1),
   }
 
   return shapes.Shape(nil, value, shapes.PointCloud)
@@ -316,25 +269,19 @@ end
 
 --- LINE ---
 
----@class LineValue
----@field v1 vec2
----@field v2 vec2
----@field width number
-
 ---@class Line : Shape
----@field value LineValue
-shapes.Line       = shapes.newshape()
-shapes.Line.v1    = shapes.animator('v1')
-shapes.Line.v2    = shapes.animator('v2')
-shapes.Line.width = shapes.animator('width')
+---@field v1    signal<vec2>
+---@field v2    signal<vec2>
+---@field width signal<number>
+shapes.Line = shapes.newshape()
 
 ---@param self Line
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Line:draw(matrix, emit)
-  local p1 = matrix * self.value.v1
-  local p2 = matrix * self.value.v2
-  emit(ir.LINE_WIDTH, self.value.width)
+  local p1 = matrix * self.v1()
+  local p2 = matrix * self.v2()
+  emit(ir.LINE_WIDTH, self.width())
   emit(ir.IDENTITY)
   emit(ir.PATH_START, p1.x, p1.y)
   emit(ir.LINE, p2.x, p2.y)
@@ -349,9 +296,9 @@ end
 ---@nodiscard
 function shapes.Line.new(x1, y1, x2, y2, width)
   local value = {
-    v1 = vector.vec2(x1, y1),
-    v2 = vector.vec2(x2, y2),
-    width = width or 1,
+    v1 = luanim.signal(vec2(x1, y1)),
+    v2 = luanim.signal(vec2(x2, y2)),
+    width = luanim.signal(width or 1),
   }
 
   return shapes.Shape(nil, value, shapes.Line)
@@ -359,22 +306,17 @@ end
 
 --- RECTANGLE ---
 
----@class RectValue
----@field v1 vec2
----@field v2 vec2
-
 ---@class Rect : Shape
----@field value RectValue
-shapes.Rect    = shapes.newshape()
-shapes.Rect.v1 = shapes.animator('v1')
-shapes.Rect.v2 = shapes.animator('v2')
+---@field v1 signal<vec2>
+---@field v2 signal<vec2>
+shapes.Rect = shapes.newshape()
 
 ---@param self Rect
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Rect:draw(matrix, emit)
   emit(ir.TRANSFORM, matrix:unpack())
-  emit(ir.RECT, self.value.v1.x, self.value.v1.y, self.value.v2.x, self.value.v2.y)
+  emit(ir.RECT, self.v1().x, self.v1().y, self.v2().x, self.v2().y)
 end
 
 ---@param x1 number
@@ -385,8 +327,8 @@ end
 ---@nodiscard
 function shapes.Rect.new(x1, y1, x2, y2)
   local value = {
-    v1 = vector.vec2(x1, y1),
-    v2 = vector.vec2(x2, y2),
+    v1 = luanim.signal(vec2(x1, y1)),
+    v2 = luanim.signal(vec2(x2, y2)),
   }
 
   return shapes.Shape(nil, value, shapes.Rect)
@@ -394,25 +336,22 @@ end
 
 --- POINTER ---
 
----@class PointerValue
----@field shape Shape
----@field iterations integer
----@field package _iteration integer
+local _iteration = 0
 
 ---@class Pointer
----@field value PointerValue
-shapes.Pointer            = shapes.newshape()
-shapes.Pointer.iterations = shapes.animator('iterations', tweens.interp.integer)
+---@field shape Shape
+---@field iterations signal<integer>
+shapes.Pointer = shapes.newshape()
 
 ---@param self Pointer
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Pointer:draw(matrix, emit)
-  if self.value._iteration == self.value.iterations then return end
+  if _iteration >= self.iterations() then return end
 
-  self.value._iteration = self.value._iteration + 1
-  self.value.shape:draw_shape(matrix, emit)
-  self.value._iteration = self.value._iteration - 1
+  _iteration = _iteration + 1
+  self.shape:draw_shape(matrix, emit)
+  _iteration = _iteration - 1
 end
 
 ---@param shape Shape
@@ -421,27 +360,27 @@ end
 ---@nodiscard
 function shapes.Pointer.new(shape, max)
   max = max or 1
-  return shapes.Shape(nil, { shape = shape, iterations = max, _iteration = 0 }, shapes.Pointer)
+  return shapes.Shape(nil, {
+    shape = shape,
+    iterations = luanim.signal(max),
+    _iteration = 0
+  }, shapes.Pointer)
 end
 
 --- TEXT ---
 
----@class TextValue
----@field text string
----@field size number
-
 ---@class Text
----@field value TextValue
-shapes.Text      = shapes.newshape()
-shapes.Text.size = shapes.animator('size')
+---@field text signal<string>
+---@field size signal<number>
+shapes.Text = shapes.newshape()
 
 ---@param self Text
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Text:draw(matrix, emit)
-  matrix = matrix * vector.mat3(self.value.size, 0, 0, self.value.size, 0, 0)
+  matrix = matrix * mat3(self.size(), 0, 0, self.size(), 0, 0)
   emit(ir.TRANSFORM, matrix:unpack())
-  emit(ir.TEXT, 0, 0, self.value.text)
+  emit(ir.TEXT, 0, 0, self.text())
 end
 
 ---@param x number
@@ -451,7 +390,10 @@ end
 ---@return Text
 ---@nodiscard
 function shapes.Text.new(x, y, text, size)
-  return shapes.Shape({ pos = vector.vec2(x, y) }, { text = text, size = size or 1 }, shapes.Text)
+  return shapes.Shape(vec2(x, y), {
+    text = luanim.signal(text),
+    size = luanim.signal(size or 1)
+  }, shapes.Text)
 end
 
 --- END SHAPES ---
@@ -477,7 +419,7 @@ function shapes.play(func)
     local skip = coroutine.yield(ir.FRAME, frame)
     if not skip then
       local fun = coroutine.yield(ir.EMIT)
-      root:draw_shape(vector.mat3.identity, fun)
+      root:draw_shape(mat3.identity, fun)
     end
 
     if not luanim.advance_frame(scene, fps, frame) then
@@ -491,6 +433,19 @@ end
 ---@param func fun(scene: Scene, root: Shape)
 function shapes.start(func)
   local co = coroutine.wrap(shapes.play)
+  co(func)
+  return co
+end
+
+local function loop(func)
+  while true do
+    shapes.play(func)
+  end
+end
+
+---@param func fun(scene: Scene, root: Shape)
+function shapes.loop(func)
+  local co = coroutine.wrap(loop)
   co(func)
   return co
 end

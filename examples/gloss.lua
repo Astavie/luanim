@@ -1,5 +1,5 @@
 local shapes = require 'shapes'
-local vec    = require 'vector'.vec2
+local vec2   = require 'vector'.vec2
 local ir     = require 'ir'
 
 local function measure(s)
@@ -19,23 +19,24 @@ local function appear(scene, text, dir, delay, speed)
   speed = speed or 0.5
   delay = delay or 0
 
-  local size = text.value.size
-  local len = measure(text.value.text) * size
+  local size = text.size()
+  local len = measure(text.text()) * size
 
   local mask = shapes.Rect(0, 3 * size, len, -11 * size)
 
-  local up = vec(dir.x * len, dir.y * 12 * size)
-  mask.transform.pos = up
+  local up = vec2(dir.x * len, dir.y * 12 * size)
+  mask.pos(up)
 
-  local old = text.transform.pos
-  text.transform.pos = old - up
+  local old = text.pos()
+  text.pos(old - up)
 
   text:add_clip(mask)
   scene:wait(delay)
 
   scene:play(function (p)
-    mask.transform.pos = up * (1 - p)
-    text.transform.pos = old - mask.transform.pos
+    local pos = up * (1 - p)
+    mask.pos(pos)
+    text.pos(old - pos)
   end, speed, ease_inout_cubic)
 
   text:remove(mask)
@@ -64,12 +65,12 @@ local function Gloss(text, gloss, y, sep)
     local t, b
 
     if i <= #top then
-      t = top[i].transform.pos
+      t = top[i].pos()
       t.x = t.x + offset_t
     end
 
     if i <= #bottom then
-      b = bottom[i].transform.pos
+      b = bottom[i].pos()
       b.x = b.x + offset_b
       b.y = y
     end
@@ -98,8 +99,8 @@ end
 
 local function text_anim(scene, root)
   local gloss, top, bottom = Gloss("n=an apedani mehuni essandu", "CONN=him that.DAT.SG time.DAT.SG eat.they.shall")
-  gloss.transform.scale = vec(1.5)
-  gloss.transform.pos.x = -200
+  gloss.scale(vec2(1.5))
+  gloss.pos(vec2(-200, 0))
   root:add_child(gloss)
 
   local translation = shapes.Text(0, 24, "'They shall celebrate him on that date.'")
@@ -107,17 +108,17 @@ local function text_anim(scene, root)
 
   local delay = 0
   for _, child in ipairs(top) do
-    scene:parallel(appear, child, vec(0, -1), delay)
+    scene:parallel(appear, child, vec2(0, -1), delay)
     delay = delay + 0.05
   end
 
   local delay = 0
   for _, child in ipairs(bottom) do
-    scene:parallel(appear, child, vec(0, 1), delay)
+    scene:parallel(appear, child, vec2(0, 1), delay)
     delay = delay + 0.05
   end
 
-  scene:parallel(appear, translation, vec(1, 0), 0.05, delay + 0.5)
+  scene:parallel(appear, translation, vec2(1, 0), 0.05, delay + 0.5)
 end
 
 return shapes.start(text_anim)
