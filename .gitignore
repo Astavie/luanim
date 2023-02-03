@@ -1,8 +1,3 @@
-*
-!/**/
-!*.*
-!Makefile
-
 ols.json
 build/**/*.*
 !build/wasm/index.html
@@ -15,3 +10,4 @@ src/files.h
 .direnv
 .envrc
 build
+wasm

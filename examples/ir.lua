@@ -1,5 +1,6 @@
 local shapes = require 'shapes'
 local vector = require 'vector'
+local luanim = require 'luanim'
 
 -- circle that keeps growing and shrinking
 local function flash(scene, object)
@@ -38,5 +39,13 @@ local function scene1(scene, root)
   -- make sure to terminate execution of infinite scenes
   scene:terminate(co)
 end
+
+local co = shapes.start(scene1)
+
+-- instr should be magic, so we send the fps
+co(10)
+
+-- print the rest of the instructions
+print(luanim.log(co))
 
 return shapes.start(scene1)

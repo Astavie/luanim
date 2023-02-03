@@ -10,113 +10,213 @@
     <p id="stdout"></p>
     <center><canvas id="canvas" width="1280" height="720" style="border:1px solid #000000;"></canvas>
     <br>
+    <input type="number" id="frames" value="60">
+    <input type="number" id="speedo" value="1">
     <input id="button" type="button" value="play"></input></center>
     <br>
     <textarea id="script" style="width: 100%; height: 100vh;"></textarea>
     <script type="module">
-        import luanim from "./luanim.js"
+        import { LuaFactory } from "./wasmoon/index.js"
 
         const stdout = document.getElementById("stdout")
         const canvas = document.getElementById("canvas")
         const script = document.getElementById("script")
         const button = document.getElementById("button")
+        const frames = document.getElementById("frames")
+        const speedo = document.getElementById("speedo")
         const ctx = canvas.getContext("2d")
 
         button.addEventListener('click', run)
 
         async function run() {
-            stdout.innerText = "";
+
+            stdout.innerText = ""
 
             const start = Date.now()
             const print = text => {
                 const now = Date.now()
                 const diff = (now - start) / 1000
-                stdout.innerText += `[${diff}] ${text}\n`
+                console.log(`[${diff}] ${text}\n`)
             }
 
             let clip = false
+            let lastx, lasty
 
-            const instance = await luanim({ 
-                print,
-                frame_start() {
-                    ctx.save()
-                    ctx.resetTransform()
-                    ctx.clearRect(0, 0, canvas.width, canvas.height)
-                    ctx.restore()
-                },
-                draw_ellipse(x, y, rx, ry, rot) {
-                    if (!clip) ctx.beginPath()
-                    ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
-                    if (!clip) ctx.fill()
-                },
-                draw_bezier(x1, y1, cx1, cy1, cx2, cy2, x2, y2) {
-                    if (!clip) ctx.beginPath()
-                    ctx.moveTo(x1, y1)
-                    ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x2, y2)
-                    if (!clip) ctx.stroke()
-                },
-                draw_config(lineWidth) {
-                    ctx.lineWidth = lineWidth
-                },
-                set_matrix(a, b, c, d, e, f) {
-                    ctx.resetTransform()
-                    ctx.translate(canvas.width / 2, canvas.height / 2)
-                    ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-                    ctx.transform(a, b, c, d, e, f)
-                },
-                draw_text(x, y, size, text) {
-                    if (clip) return // no support for text as clip path
-                    ctx.save()
-                    ctx.translate(x, y)
-                    ctx.scale(size, size)
-                    ctx.fillText(text, 0, 0)
-                    ctx.restore()
-                },
-                draw_rect(x1, y1, x2, y2) {
-                    if (!clip) ctx.beginPath()
-                    ctx.rect(x1, y1, x2, y2)
-                    if (!clip) ctx.fill()
-                },
-                measure(text) {
-                    return ctx.measureText(text).width
-                },
-                clip_push() {
-                    ctx.save()
-                },
-                clip_start() {
-                    ctx.beginPath()
-                    clip = true
-                },
-                clip_end() {
-                    clip = false
-                    ctx.clip()
-                },
-                clip_pop() {
-                    ctx.restore()
-                },
-            })
+            const factory = new LuaFactory("./wasmoon/glue.wasm")
+            await factory.mountFile("ir.lua", await (await fetch("./lua/ir.lua")).text())
+            await factory.mountFile("luanim.lua", await (await fetch("./lua/luanim.lua")).text())
+            await factory.mountFile("shapes.lua", await (await fetch("./lua/shapes.lua")).text())
+            await factory.mountFile("vector.lua", await (await fetch("./lua/vector.lua")).text())
+            await factory.mountFile("tweens.lua", await (await fetch("./lua/tweens.lua")).text())
+            const lua = await factory.createEngine()
 
-            if (!instance) {
-                print("could not start luanim")
-                return
+            const thread = lua.global.newThread()
+            const threadIndex = lua.global.getTop()
+
+            const draw = (buffer, size) => {
+                let index = 0
+                while (index < size) {
+                    const old = index
+                    const num = (i) => {
+                        if (index < old + i + 1) index = old + i + 1
+                        return thread.lua.module.getValue(buffer + (i + old) * 8, 'double')
+                    }
+                    const str = (i) => {
+                        if (index < old + i + 1) index = old + i + 1
+                        const ptr = thread.lua.module.getValue(buffer + (i + old) * 8, 'i8*')
+                        const s = thread.lua.module.UTF8ToString(ptr)
+                        thread.lua.module._free(ptr)
+                        return s
+                    }
+
+                    const instr = num(0)
+                    switch (instr) {
+                        case 2: // TRANSFORM
+                            ctx.resetTransform()
+                            ctx.translate(canvas.width / 2, canvas.height / 2)
+                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                            ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                            break
+                        case 4: // CLIP START
+                            ctx.save()
+                            ctx.beginPath()
+                            clip = true
+                            break
+                        case 5: // CLIP PUSH
+                            clip = false
+                            ctx.clip()
+                            break
+                        case 6: // CLIP POP
+                            ctx.restore()
+                            break
+                        case 7: // PATH START
+                            if (!clip) ctx.beginPath()
+                            lastx = num(1)
+                            lasty = num(2)
+                            ctx.moveTo(lastx, lasty)
+                            break
+                        case 9: // LINE
+                            ctx.lineTo(num(1), num(2))
+                            break
+                        case 10: // CLOSE PATH
+                            ctx.lineTo(lastx, lasty)
+                            break
+                        case 20: // END PATH
+                            if (!clip) ctx.stroke()
+                            break
+                        case 11: // RECTANGLE
+                            if (!clip) ctx.beginPath()
+                            ctx.rect(num(1), num(2), num(3), num(4))
+                            if (!clip) ctx.fill()
+                            break
+                        case 13: // TEXT
+                            if (clip) return // no clip for text
+                            ctx.fillText(str(3), num(1), num(2))
+                            break
+                        case 17: // IDENTITY
+                            ctx.resetTransform()
+                            ctx.translate(canvas.width / 2, canvas.height / 2)
+                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                            break
+                        case 19: // CIRCLE
+                            if (!clip) ctx.beginPath()
+                            ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
+                            if (!clip) ctx.fill()
+                            break
+                        default:
+                            print("UNKNOWN " + instr)
+                            break
+                    }
+                }
             }
 
-            const ret = instance.load(script.value)
-            if (!ret) {
-                print(instance.peekstring())
-            } else {
-                await new Promise(resolve => {
-                    const interval = setInterval(function() {
-                        const resume = instance.advance()
-                        if (!resume) {
-                            clearInterval(interval)
-                            resolve()
+            const fpDraw = thread.lua.module.addFunction(draw, 'vii')
+            const fpEmit = thread.lua.module._luanim_emitter(fpDraw)
+
+            try {
+                // open script
+                thread.loadString(script.value)
+                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
+
+                // load emit function
+                thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
+
+                // loop
+                let args = 1
+                let func = thread.lua.lua_gettop(thread.address)
+                thread.lua.lua_pushvalue(thread.address, -2)
+                thread.lua.lua_pushnumber(thread.address, frames.value / speedo.value)
+
+                const num = (i) => thread.lua.luaL_checknumber (thread.address, func + 1 + i)
+                const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i)
+                const pop = () => {
+                    thread.lua.lua_settop(thread.address, func)
+                    thread.lua.lua_pushvalue(thread.address, -2)
+                }
+
+                await new Promise(r => {
+                    let interval
+                    const frame = () => {
+                        ctx.save()
+                        ctx.resetTransform()
+                        ctx.clearRect(0, 0, canvas.width, canvas.height)
+                        ctx.restore()
+
+                        while (true) {
+                            thread.assertOk(thread.lua.lua_pcallk(thread.address, args, -1, 0, 0, null))
+
+                            if (thread.lua.lua_gettop(thread.address) == func) {
+                                // the end
+                                if (interval) clearInterval(interval)
+                                thread.lua.module._luanim_draw()
+
+                                r()
+                                return
+                            }
+
+                            const params = thread.lua.lua_gettop(thread.address) - func
+                            const instr = num(0)
+                            args = 0
+
+                            switch (instr) {
+                                case 1: // FRAME
+                                    // const frame = num(1)
+                                    // print("FRAME " + frame)
+                                    pop()
+                                    thread.lua.module._luanim_draw()
+                                    return
+                                case 14: // MEASURE
+                                    const width = ctx.measureText(str(1)).width
+                                    pop()
+                                    thread.lua.lua_pushnumber(thread.address, width)
+                                    args = 1
+                                    break
+                                case 16: // FPS
+                                    if (interval) clearInterval(interval)
+                                    interval = setInterval(frame, 1000 / num(1) / speedo.value)
+                                    pop()
+                                    break
+                                case 21: // EMIT
+                                    pop()
+                                    thread.lua.lua_pushvalue(thread.address, -2)
+                                    args = 1
+                                    break
+                                default:
+                                    // Call the emit function
+                                    thread.lua.lua_pcallk(thread.address, params, -1, 0, 0, null)
+                                    thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
+                                    pop()
+                                    break
+                            }
                         }
-                    }, 16);
+                    }
+                    frame()
                 })
+            } finally {
+                thread.lua.module.removeFunction(fpEmit)
+                lua.global.close()
+                lua.global.remove(threadIndex)
             }
-
-            instance.close()
         }
     </script>
 </body>

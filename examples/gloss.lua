@@ -1,11 +1,14 @@
 local shapes = require 'shapes'
-local canvas = require 'canvas'
+local vec    = require 'vector'.vec2
+local ir     = require 'ir'
 
-local vec = require 'vector'.vec2
+local function measure(s)
+  return coroutine.yield(ir.MEASURE, s)
+end
 
 local function ease_inout_cubic(x)
   if x < 0.5 then
-    return 2 * x * x * x
+    return 4 * x * x * x
   else
     local y = -2 * x + 2
     return 1 - y * y * y / 2
@@ -17,7 +20,7 @@ local function appear(scene, text, dir, delay, speed)
   delay = delay or 0
 
   local size = text.value.size
-  local len = canvas:measure(text.value.text) * size
+  local len = measure(text.value.text) * size
 
   local mask = shapes.Rect(0, 3 * size, len, -11 * size)
 
@@ -39,12 +42,12 @@ local function appear(scene, text, dir, delay, speed)
 end
 
 local function words(text, sep)
-  sep = sep or canvas:measure("    ")
+  sep = sep or measure("    ")
   local all = {}
   local x = 0
   for token in string.gmatch(text, "[^%s]+") do
     table.insert(all, shapes.Text(x, 0, token))
-    x = x + canvas:measure(token) + sep
+    x = x + measure(token) + sep
   end
   return all
 end
@@ -117,4 +120,4 @@ local function text_anim(scene, root)
   scene:parallel(appear, translation, vec(1, 0), 0.05, delay + 0.5)
 end
 
-shapes.play(canvas, text_anim)
+return shapes.start(text_anim)

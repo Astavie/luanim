@@ -1,6 +1,5 @@
 local shapes = require 'shapes'
 local vector = require 'vector'
-local canvas = require 'canvas'
 
 local function binary_tree(angle, scale, it)
   local trunk = shapes.Shape()
@@ -49,4 +48,4 @@ local function tree_anim(scene, root)
   scene:play(text:size(0), 1)
 end
 
-shapes.play(canvas, tree_anim)
+return shapes.start(tree_anim)

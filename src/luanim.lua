@@ -1,3 +1,5 @@
+local ir = require 'ir'
+
 local luanim = {}
 
 ---@class Instruction
@@ -54,9 +56,20 @@ function luanim.Scene:parallel(func, ...)
 
   self.threads[id] = coroutine.create(func);
 
-  local alive, co = coroutine.resume(self.threads[id], self, ...)
-  if alive and co ~= nil then
-    self.queued[id] = co
+  local ret = {coroutine.resume(self.threads[id], self, ...)}
+  local alive = ret[1]
+  local instr = ret[2]
+
+  while alive and type(instr) == 'number' do
+      -- if we yielded an instruction, yield it back up the call stack
+      local resume = {coroutine.yield(select(2, table.unpack(ret)))}
+      ret = {coroutine.resume(self.threads[id], table.unpack(resume))}
+      alive = ret[1]
+      instr = ret[2]
+  end
+
+  if alive and instr ~= nil then
+    self.queued[id] = instr
   else
     self:terminate(id)
   end
@@ -94,10 +107,9 @@ function luanim.advance_frame(scene, fps, prev_frame)
   local time = prev_frame * frame_time
   local next = (prev_frame + 1) * frame_time
 
-  local has_entries = false
-  for id, instr in pairs(scene.queued) do
-    has_entries = true
+  local hasNext = _G.next(scene.queued) ~= nil
 
+  for id, instr in pairs(scene.queued) do
     scene.time = time
 
     -- resume while finished
@@ -110,11 +122,21 @@ function luanim.advance_frame(scene, fps, prev_frame)
       end
 
       -- resume coroutine
-      local alive
-      alive, instr = coroutine.resume(scene.threads[id])
-      scene.queued[id] = instr
+      local ret = {coroutine.resume(scene.threads[id])}
+      local alive = ret[1]
+      instr = ret[2]
 
-      if not alive or instr == nil then
+      while alive and type(instr) == 'number' do
+        -- if we yielded an instruction, yield it back up the call stack
+        local resume = {coroutine.yield(select(2, table.unpack(ret)))}
+        ret = {coroutine.resume(scene.threads[id], table.unpack(resume))}
+        alive = ret[1]
+        instr = ret[2]
+      end
+
+      if alive and instr ~= nil then
+        scene.queued[id] = instr
+      else
         table.insert(scene.to_remove, id)
         goto loop_end
       end
@@ -142,7 +164,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
   end
   scene.to_remove = {}
 
-  return has_entries
+  return hasNext
 end
 
 ---@param ... fun(scene: Scene)
@@ -152,6 +174,40 @@ function luanim.play(...)
     scene:parallel(func)
     local frame = 0
     while luanim.advance_frame(scene, 60, frame) do frame = frame + 1 end
+  end
+end
+
+function luanim.log(f)
+  local log = ""
+  local function emit(...)
+    for i, x in ipairs({...}) do
+      if i == 1 then
+        for k, v in pairs(ir) do
+          if x == v then
+            log = log .. k
+            break
+          end
+        end
+      else
+        log = log .. " " .. x
+      end
+    end
+    log = log .. "\n"
+  end
+
+  local args = {}
+  while true do
+    local ret = {f(table.unpack(args))}
+    if not ret[1] then return log end
+
+    args = {}
+    if ret[1] == ir.MEASURE then
+      table.insert(args, 1) -- every measurement will just be 1
+    elseif ret[1] == ir.EMIT then
+      table.insert(args, emit)
+    else
+      emit(table.unpack(ret))
+    end
   end
 end
 
