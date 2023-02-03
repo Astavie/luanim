@@ -93,6 +93,21 @@ function vector.vec2.__eq(a, b)
 end
 
 ---@param self vec2
+---@param vec vec2
+---@return number
+function vector.vec2:distanceSquared(vec)
+  local x, y = vec.x - self.x, vec.y - self.y
+  return x * x + y * y
+end
+
+---@param self vec2
+---@param vec vec2
+---@return number
+function vector.vec2:distance(vec)
+  return math.sqrt(self:distanceSquared(vec))
+end
+
+---@param self vec2
 ---@return vec2
 function vector.vec2:log()
   return vector.vec2(math.log(self.x), math.log(self.y))

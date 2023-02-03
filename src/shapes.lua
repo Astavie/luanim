@@ -94,6 +94,22 @@ function shapes.Shape.new(pos, value, metatable)
     return mat3(a, b, c, d, e, f)
   end)
 
+  shape.absoluteTransform = luanim.signal(function()
+    local matrix = shape.transform()
+    if shape.parent then
+      matrix = shape.parent.absoluteTransform() * matrix
+    end
+    return matrix
+  end)
+
+  shape.absolutePos = luanim.signal(function()
+    local vec = shape.pos()
+    if shape.parent then
+      vec = shape.parent.absoluteTransform() * vec
+    end
+    return vec
+  end)
+
   for k, v in pairs(value or {}) do
     shape[k] = v
   end
@@ -267,6 +283,52 @@ function shapes.PointCloud.new(point, min, max, radius)
   return shapes.Shape(nil, value, shapes.PointCloud)
 end
 
+--- TRACE ---
+
+---@class Trace : Shape
+---@field handle signal<vec2>
+---@field width signal<number>
+---@field accuracy number
+---
+---@field package list vec2[]
+shapes.Trace = shapes.newshape()
+
+---@param self Trace
+---@param matrix mat3
+---@param emit fun(...)
+function shapes.Trace:draw(matrix, emit)
+  -- update list
+  local last = self.list[#self.list]
+  local this = self.handle()
+  if last:distanceSquared(this) >= self.accuracy * self.accuracy then
+    table.insert(self.list, this)
+  end
+
+  -- draw
+  if #self.list == 1 then return end
+  local a, b, c, d, e, f = matrix:unpack()
+
+  emit(ir.LINE_WIDTH, self.width())
+  emit(ir.IDENTITY)
+  for i, vec in ipairs(self.list) do
+    local instr = ir.LINE
+    if i == 1 then instr = ir.PATH_START end
+    emit(instr, a * vec.x + c * vec.y + e, b * vec.x + d * vec.y + f)
+  end
+  emit(ir.PATH_END)
+end
+
+function shapes.Trace.new(x, y, width, accuracy)
+  local value = {
+    handle = luanim.signal(vec2(x, y)),
+    width = luanim.signal(width or 1),
+    accuracy = accuracy or 1,
+    list = { vec2(x, y) },
+  }
+
+  return shapes.Shape(nil, value, shapes.Trace)
+end
+
 --- LINE ---
 
 ---@class Line : Shape
@@ -285,6 +347,7 @@ function shapes.Line:draw(matrix, emit)
   emit(ir.IDENTITY)
   emit(ir.PATH_START, p1.x, p1.y)
   emit(ir.LINE, p2.x, p2.y)
+  emit(ir.PATH_END)
 end
 
 ---@param x1 number

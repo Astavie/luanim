@@ -181,7 +181,7 @@ end
 local parentSignal
 
 ---@alias interp<T> fun(a: T, b: T, p: number): T
----@alias signal<T> fun(value?: T, time?: number, easing?: easing, interp?: interp<T>): T
+---@alias signal<T> fun(value?: T | (fun(): T), time?: number, easing?: easing, interp?: interp<T>): T
 
 local function invalidate(signal)
   for k, _ in pairs(signal.dependents) do
@@ -247,15 +247,13 @@ function luanim.signal(value, definterp)
     end
 
     interp = interp or definterp
-    local oldval = value
     local old, new
-    value = newval
 
     -- if the old value is a function, clone it for the transition
     if type(value) == 'function' then
-      old = luanim.signal(oldval)
+      old = luanim.signal(value)
     else
-      old = function() return oldval end
+      old = function() return value end
     end
 
     -- if the new value is a function, create a signal for it
@@ -269,10 +267,19 @@ function luanim.signal(value, definterp)
       signal.cache = interp(old(), new(), p)
       invalidate(signal)
     end })
+
+    -- set value
+    value = newval
+    if type(value) ~= 'function' then
+      signal.cache = value
+    else
+      signal.cache = nil
+    end
+    invalidate(signal)
   end
 end
 
-function luanim.log(f)
+function luanim.log(f, args)
   local log = ""
   local function emit(...)
     for i, x in ipairs({...}) do
@@ -290,10 +297,10 @@ function luanim.log(f)
     log = log .. "\n"
   end
 
-  local args = {}
+  args = args or {}
   while true do
     local ret = {f(table.unpack(args))}
-    if not ret[1] then return log end
+    if ret[1] == nil then return log end
 
     args = {}
     if ret[1] == ir.MEASURE then

@@ -12,7 +12,8 @@
     <br>
     <input type="number" id="frames" value="60">
     <input type="number" id="speedo" value="1">
-    <input id="button" type="button" value="play"></input></center>
+    <input id="button" type="button" value="play"></input>
+    <input id="stoplz" type="button" value="stop"></input></center>
     <br>
     <textarea id="script" style="width: 100%; height: 100vh;"></textarea>
     <script type="module">
@@ -22,6 +23,7 @@
         const canvas = document.getElementById("canvas")
         const script = document.getElementById("script")
         const button = document.getElementById("button")
+        const stoplz = document.getElementById("stoplz")
         const frames = document.getElementById("frames")
         const speedo = document.getElementById("speedo")
         const ctx = canvas.getContext("2d")
@@ -29,6 +31,12 @@
         button.addEventListener('click', run)
 
         let interval, resolve
+
+        stoplz.addEventListener('click', () => {
+            if (!interval) return
+            clearInterval(interval)
+            resolve()
+        })
 
         async function run() {
 
@@ -83,6 +91,9 @@
                             ctx.translate(canvas.width / 2, canvas.height / 2)
                             ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
                             ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                            break
+                        case 3: // LINE WIDTH
+                            ctx.lineWidth = num(1)
                             break
                         case 4: // CLIP START
                             ctx.save()
@@ -176,7 +187,6 @@
                                 // the end
                                 if (interval) clearInterval(interval)
                                 interval = undefined
-                                thread.lua.module._luanim_draw()
                                 resolve()
                                 return
                             }
@@ -223,6 +233,7 @@
                     frame()
                 })
             } finally {
+                thread.lua.module._luanim_draw()
                 thread.lua.module.removeFunction(fpEmit)
                 lua.global.close()
                 lua.global.remove(threadIndex)
