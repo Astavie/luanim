@@ -54,9 +54,20 @@ function luanim.Scene:parallel(func, ...)
 
   self.threads[id] = coroutine.create(func);
 
-  local alive, co = coroutine.resume(self.threads[id], self, ...)
-  if alive and co ~= nil then
-    self.queued[id] = co
+  local ret = {coroutine.resume(self.threads[id], self, ...)}
+  local alive = ret[1]
+  local instr = ret[2]
+
+  while alive and type(instr) == 'number' do
+      -- if we yielded an instruction, yield it back up the call stack
+      local resume = {coroutine.yield(select(2, table.unpack(ret)))}
+      ret = {coroutine.resume(self.threads[id], table.unpack(resume))}
+      alive = ret[1]
+      instr = ret[2]
+  end
+
+  if alive and instr ~= nil then
+    self.queued[id] = instr
   else
     self:terminate(id)
   end
@@ -119,9 +130,9 @@ function luanim.advance_frame(scene, fps, prev_frame)
         instr = ret[2]
       end
 
-      scene.queued[id] = instr
-
-      if not alive or instr == nil then
+      if alive and instr ~= nil then
+        scene.queued[id] = instr
+      else
         table.insert(scene.to_remove, id)
         goto loop_end
       end

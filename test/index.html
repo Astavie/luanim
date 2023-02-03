@@ -34,7 +34,7 @@
             const print = text => {
                 const now = Date.now()
                 const diff = (now - start) / 1000
-                stdout.innerText += `[${diff}] ${text}\n`
+                console.log(`[${diff}] ${text}\n`)
             }
 
             let clip = false
@@ -74,15 +74,36 @@
                             ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
                             ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
                             break
+                        case 4: // CLIP START
+                            ctx.save()
+                            ctx.beginPath()
+                            clip = true
+                            break
+                        case 5: // CLIP PUSH
+                            clip = false
+                            ctx.clip()
+                            break
+                        case 6: // CLIP POP
+                            ctx.restore()
+                            break
+                        case 11:
+                            if (!clip) ctx.beginPath()
+                            ctx.rect(num(1), num(2), num(3), num(4))
+                            if (!clip) ctx.fill()
+                            break
+                        case 13: // TEXT
+                            if (clip) return // no clip for text
+                            ctx.fillText(str(3), num(1), num(2))
+                            break
                         case 17: // IDENTITY
                             ctx.resetTransform()
                             ctx.translate(canvas.width / 2, canvas.height / 2)
                             ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
                             break
                         case 19: // CIRCLE
-                            ctx.beginPath()
+                            if (!clip) ctx.beginPath()
                             ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
-                            ctx.fill()
+                            if (!clip) ctx.fill()
                             break
                         default:
                             print("UNKNOWN " + instr)
@@ -99,16 +120,20 @@
                 thread.loadString(script.value)
                 thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
 
+                // load emit function
+                thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
+
                 // loop
                 let args = 1
                 let func = thread.lua.lua_gettop(thread.address)
-                thread.lua.lua_pushvalue(thread.address, -1)
+                thread.lua.lua_pushvalue(thread.address, -2)
                 thread.lua.lua_pushnumber(thread.address, frames.value)
 
-                const num = (i) => thread.lua.luaL_checknumber(thread.address, func + 1 + i)
+                const num = (i) => thread.lua.luaL_checknumber (thread.address, func + 1 + i)
+                const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i)
                 const pop = () => {
                     thread.lua.lua_settop(thread.address, func)
-                    thread.lua.lua_pushvalue(thread.address, -1)
+                    thread.lua.lua_pushvalue(thread.address, -2)
                 }
 
                 await new Promise(r => {
@@ -131,6 +156,7 @@
                                 return
                             }
 
+                            const params = thread.lua.lua_gettop(thread.address) - func
                             const instr = num(0)
                             args = 0
 
@@ -141,6 +167,12 @@
                                     pop()
                                     thread.lua.module._luanim_draw()
                                     return
+                                case 14: // MEASURE
+                                    const width = ctx.measureText(str(1)).width
+                                    pop()
+                                    thread.lua.lua_pushnumber(thread.address, width)
+                                    args = 1
+                                    break
                                 case 16: // FPS
                                     if (interval) clearInterval(interval)
                                     interval = setInterval(frame, 1000 / num(1))
@@ -148,11 +180,13 @@
                                     break
                                 case 21: // EMIT
                                     pop()
-                                    thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
+                                    thread.lua.lua_pushvalue(thread.address, -2)
                                     args = 1
                                     break
                                 default:
-                                    emit(thread.address, func + 1)
+                                    // Call the emit function
+                                    thread.lua.lua_pcallk(thread.address, params, -1, 0, 0, null)
+                                    thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
                                     pop()
                                     break
                             }
@@ -165,68 +199,6 @@
                 lua.global.close()
                 lua.global.remove(threadIndex)
             }
-
-            // const instance = await luanim({ 
-            //     print,
-            //     frame_start() {
-            //         ctx.save()
-            //         ctx.resetTransform()
-            //         ctx.clearRect(0, 0, canvas.width, canvas.height)
-            //         ctx.restore()
-            //     },
-            //     draw_ellipse(x, y, rx, ry, rot) {
-            //         if (!clip) ctx.beginPath()
-            //         ctx.ellipse(x, y, rx, ry, rot, 0, 2 * Math.PI)
-            //         if (!clip) ctx.fill()
-            //     },
-            //     path_start(x, y) {
-            //         if (!clip) ctx.beginPath()
-            //         ctx.moveTo(x1, y1)
-            //     },
-            //     draw_bezier(cx1, cy1, cx2, cy2, x, y) {
-            //         ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x, y)
-            //     },
-            //     path_end() {
-            //         if (!clip) ctx.stroke()
-            //     },
-            //     set_line_width(lineWidth) {
-            //         ctx.lineWidth = lineWidth
-            //     },
-            //     set_matrix(a, b, c, d, e, f) {
-            //         ctx.resetTransform()
-            //         ctx.translate(canvas.width / 2, canvas.height / 2)
-            //         ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-            //         ctx.transform(a, b, c, d, e, f)
-            //     },
-            //     draw_text(x, y, size, text) {
-            //         if (clip) return // no support for text as clip path
-            //         ctx.save()
-            //         ctx.translate(x, y)
-            //         ctx.scale(size, size)
-            //         ctx.fillText(text, 0, 0)
-            //         ctx.restore()
-            //     },
-            //     draw_rect(x1, y1, x2, y2) {
-            //         if (!clip) ctx.beginPath()
-            //         ctx.rect(x1, y1, x2, y2)
-            //         if (!clip) ctx.fill()
-            //     },
-            //     measure(text) {
-            //         return ctx.measureText(text).width
-            //     },
-            //     clip_start() {
-            //         ctx.save()
-            //         ctx.beginPath()
-            //         clip = true
-            //     },
-            //     clip_push() {
-            //         clip = false
-            //         ctx.clip()
-            //     },
-            //     clip_pop() {
-            //         ctx.restore()
-            //     },
-            // })
         }
     </script>
 </body>
