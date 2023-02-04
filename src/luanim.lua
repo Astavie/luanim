@@ -39,6 +39,107 @@ function luanim.Scene:play(anim, time, easing)
   coroutine.yield({ duration = time, anim = anim, easing = easing })
 end
 
+---@generic T
+---@generic C
+---@param signal signal<T, C>
+---@param func fun(prev: T, delta: number, ctx: C): T
+function luanim.Scene:advance(signal, func)
+
+  local prev = signal()
+  local time = self:clock()
+
+  signal(function(ctx)
+    local delta = self:clock() - time
+    prev = func(prev, delta, ctx)
+    time = self:clock()
+    return prev
+  end)
+end
+
+---@param self Scene
+---@param time number
+---@param func fun(scene: Scene, ...: any)
+---@param ... any
+---@return id
+function luanim.Scene:interval(time, func, ...)
+  local args = {...}
+  return self:parallel(function() 
+    while true do
+      self:parallel(func, table.unpack(args))
+      self:wait(time)
+    end
+  end)
+end
+
+local function sign(x)
+  return x > 0 and 1 or -1
+end
+
+---@param a number | fun(): number
+---@param b number | fun(): number
+---
+---@param x0? number
+---@param x1? number
+---
+---@param eps? number
+---@param max? integer
+function luanim.Scene:waitUntil(a, b, x0, x1, eps, max)
+  if type(a) ~= 'function' then
+    local val = a
+    a = function() return val end
+  end
+  if type(b) ~= 'function' then
+    local val = b
+    b = function() return val end
+  end
+
+  eps = eps or 0.01
+  max = max or 20
+
+  -- Bisection
+  -- with time travel
+  local start = self.time()
+  x0 = x0 or 0.1
+  x1 = x1 or x0 + 10
+
+  x0 = x0 + start
+  x1 = x1 + start
+
+  self.time(x0)
+  local v0 = sign(a() - b())
+  self.time(x1)
+  local v1 = sign(a() - b())
+
+  for _ = 1, max do
+    -- get new interation
+    local middle = (x0 + x1) / 2
+    self.time(middle)
+    local value = sign(a() - b())
+
+    if v0 ~= value then
+      x1 = middle
+      v1 = value
+    elseif v1 ~= value then
+      x0 = middle
+      v0 = value
+    else
+      -- all the same sign
+      -- we'll always guess to the left
+      x1 = middle
+      v1 = value
+    end
+
+    -- check if close enough
+    if math.abs(x1 - x0) < eps then
+      break
+    end
+  end
+
+  -- reset time
+  self.time(start)
+  self:wait(x0 - start)
+end
+
 ---@alias id integer
 
 ---@param self Scene
@@ -165,6 +266,8 @@ function luanim.advance_frame(scene, fps, prev_frame)
     ::loop_end::
   end
 
+  scene.time(next)
+
   -- remove finished coroutines
   for _, id in ipairs(scene.to_remove) do
     if scene.threads[id] ~= nil then
@@ -221,7 +324,7 @@ function luanim.signal(value, definterp, context)
 
   return function(newval, time, easing, interp)
     -- GET VALUE --
-    if newval == nil then
+    if newval == nil or parentSignal ~= nil then
       if parentSignal ~= nil then
         -- update dependencies
         parentSignal.dependencies[signal] = signal
@@ -229,17 +332,31 @@ function luanim.signal(value, definterp, context)
       end
 
       if signal.cache == nil then
-        -- value must be an invalidated function
-        local parent = parentSignal
-        parentSignal = signal
-        signal.cache = value(context)
-        parentSignal = parent
+        -- value must be invalidated
+        -- remove dependencies
+        for k, _ in pairs(signal.dependencies) do
+          k.dependents[signal] = nil
+        end
+        signal.dependencies = {}
+
+        if type(value) == 'function' then
+          local parent = parentSignal
+          parentSignal = signal
+          signal.cache = value(context)
+          parentSignal = parent
+        else
+          signal.cache = value
+        end
       end
 
       return signal.cache
     end
 
     -- SET VALUE --
+    if newval == value then
+      return
+    end
+
     -- remove dependencies
     for k, _ in pairs(signal.dependencies) do
       k.dependents[signal] = nil
@@ -260,13 +377,14 @@ function luanim.signal(value, definterp, context)
     end
 
     interp = interp or definterp
+    local oldval = value
     local old, new
 
     -- if the old value is a function, clone it for the transition
     if type(value) == 'function' then
-      old = luanim.signal(value, nil, context)
+      old = luanim.signal(oldval, nil, context)
     else
-      old = function() return value end
+      old = function() return oldval end
     end
 
     -- if the new value is a function, create a signal for it
@@ -277,7 +395,8 @@ function luanim.signal(value, definterp, context)
     end
 
     coroutine.yield({ duration = time, easing = easing, anim = function (p)
-      signal.cache = interp(old(), new(), p)
+      value = interp(old(), new(), p)
+      signal.cache = value
       invalidate(signal)
     end })
 

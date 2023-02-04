@@ -69,6 +69,7 @@ function shapes.Shape:draw_shape(matrix, emit, ignore_clips)
   end
 end
 
+---@param shape Shape
 local function transform(shape)
   local cos = math.cos(shape.angle())
   local sin = math.sin(shape.angle())
@@ -83,6 +84,7 @@ local function transform(shape)
   return mat3(a, b, c, d, e, f)
 end
 
+---@param shape Shape
 local function inverse(shape)
   local cos = math.cos(shape.angle())
   local sin = math.sin(shape.angle())
@@ -100,6 +102,7 @@ local function inverse(shape)
   return mat3(a, b, c, d, e, f)
 end
 
+---@param shape Shape
 local function rootTransform(shape)
   local matrix = shape.transform()
   if shape.parent then
@@ -108,6 +111,7 @@ local function rootTransform(shape)
   return matrix
 end
 
+---@param shape Shape
 local function rootInverse(shape)
   local matrix = shape.inverse()
   if shape.parent then
@@ -116,6 +120,7 @@ local function rootInverse(shape)
   return matrix
 end
 
+---@param shape Shape
 local function rootPos(shape)
   local vec = shape.pos()
   if shape.parent then
@@ -343,7 +348,7 @@ shapes.Trace = shapes.newshape()
 function shapes.Trace:update()
   local last = self.list[#self.list]
   local this = self.pos()
-  if last:distanceSquared(this) >= self.accuracy() * self.accuracy() then
+  if last:distanceSq(this) >= self.accuracy() * self.accuracy() then
     table.insert(self.list, this)
   end
 end
@@ -361,18 +366,19 @@ function shapes.Trace:draw(matrix, emit)
   self:update()
 
   -- draw
-  if #self.list == 1 then return end
-
-  -- ignore e and f (current pos)
-  local a, b, c, d = matrix:unpack()
+  local a, b, c, d, e, f = (matrix * self:inverse()):unpack()
 
   emit(ir.LINE_WIDTH, self.width())
   emit(ir.IDENTITY)
   for i, vec in ipairs(self.list) do
     local instr = ir.LINE
     if i == 1 then instr = ir.PATH_START end
-    emit(instr, a * vec.x + c * vec.y, b * vec.x + d * vec.y)
+    emit(instr, a * vec.x + c * vec.y + e, b * vec.x + d * vec.y + f)
   end
+
+  local vec = self.pos()
+  emit(ir.LINE, a * vec.x + c * vec.y + e, b * vec.x + d * vec.y + f)
+
   emit(ir.PATH_END)
 end
 
@@ -404,7 +410,7 @@ shapes.Line = shapes.newshape()
 ---@param matrix mat3
 ---@param emit fun(...)
 function shapes.Line:draw(matrix, emit)
-  local p1 = matrix * self.pos()
+  local p1 = matrix * vec2(0, 0)
   local p2 = matrix * self.vec()
   emit(ir.LINE_WIDTH, self.width())
   emit(ir.IDENTITY)
@@ -519,7 +525,8 @@ function shapes.next_id()
 end
 
 ---@param func fun(scene: Scene, root: Shape)
-function shapes.play(func)
+---@param cont? boolean
+function shapes.play(func, cont)
   local fps = coroutine.yield(ir.MAGIC, ir.SHAPES)
   coroutine.yield(ir.FPS, fps)
 
@@ -535,7 +542,7 @@ function shapes.play(func)
       root:draw_shape(mat3.identity, fun)
     end
 
-    if not luanim.advance_frame(scene, fps, frame) then
+    if not luanim.advance_frame(scene, fps, frame) and not cont then
       return
     end
 
@@ -544,9 +551,10 @@ function shapes.play(func)
 end
 
 ---@param func fun(scene: Scene, root: Shape)
-function shapes.start(func)
+---@param cont? boolean
+function shapes.start(func, cont)
   local co = coroutine.wrap(shapes.play)
-  co(func)
+  co(func, cont)
   return co
 end
 

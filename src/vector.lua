@@ -95,7 +95,7 @@ end
 ---@param self vec2
 ---@param vec vec2
 ---@return number
-function vector.vec2:distanceSquared(vec)
+function vector.vec2:distanceSq(vec)
   local x, y = vec.x - self.x, vec.y - self.y
   return x * x + y * y
 end
@@ -104,7 +104,19 @@ end
 ---@param vec vec2
 ---@return number
 function vector.vec2:distance(vec)
-  return math.sqrt(self:distanceSquared(vec))
+  return math.sqrt(self:distanceSq(vec))
+end
+
+---@param self vec2
+---@return number
+function vector.vec2:lengthSq()
+  return self.x * self.x + self.y * self.y
+end
+
+---@param self vec2
+---@return number
+function vector.vec2:length()
+  return math.sqrt(self:lengthSq())
 end
 
 ---@param self vec2

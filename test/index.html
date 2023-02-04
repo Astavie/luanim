@@ -28,6 +28,9 @@
         const speedo = document.getElementById("speedo")
         const ctx = canvas.getContext("2d")
 
+        ctx.fillStyle = "white"
+        ctx.strokeStyle = "white"
+
         button.addEventListener('click', run)
 
         let interval, resolve
@@ -176,8 +179,11 @@
                     resolve = r
                     const frame = () => {
                         ctx.save()
+                        ctx.fillStyle = "black"
                         ctx.resetTransform()
-                        ctx.clearRect(0, 0, canvas.width, canvas.height)
+                        ctx.beginPath()
+                        ctx.rect(0, 0, canvas.width, canvas.height)
+                        ctx.fill()
                         ctx.restore()
 
                         while (true) {
