@@ -10,7 +10,7 @@ local luanim = {}
 ---@field easing?   easing
 
 ---@class Scene
----@field package time      signal<seconds>
+---@field package time      signal<seconds, nil>
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
 ---@field package to_remove id[]
@@ -180,8 +180,9 @@ end
 
 local parentSignal
 
----@alias interp<T> fun(a: T, b: T, p: number): T
----@alias signal<T> fun(value?: T | (fun(): T), time?: number, easing?: easing, interp?: interp<T>): T
+---@alias interp<T>         fun(a: T, b: T, p: number): T
+---@alias signalValue<T, C> T | fun(ctx: C): T
+---@alias signal<T, C>      fun(value?: signalValue<T, C>, time?: number, easing?: easing, interp?: interp<T>): T
 
 local function invalidate(signal)
   for k, _ in pairs(signal.dependents) do
@@ -191,10 +192,22 @@ local function invalidate(signal)
 end
 
 ---@generic T
----@param value T | fun(): T
+---@generic C
+---@param value signalValue<T, C>
+---@param context? C
+---@return fun(): T
+function luanim.computed(value, context)
+  local signal = luanim.signal(value, nil, context)
+  return function() return signal() end
+end
+
+---@generic T
+---@generic C
+---@param value signalValue<T, C>
 ---@param definterp? interp<T>
----@return signal<T>
-function luanim.signal(value, definterp)
+---@param context? C
+---@return signal<T, C>
+function luanim.signal(value, definterp, context)
   definterp = definterp or tweens.interp.linear
 
   local signal = {
@@ -219,7 +232,7 @@ function luanim.signal(value, definterp)
         -- value must be an invalidated function
         local parent = parentSignal
         parentSignal = signal
-        signal.cache = value()
+        signal.cache = value(context)
         parentSignal = parent
       end
 
@@ -251,14 +264,14 @@ function luanim.signal(value, definterp)
 
     -- if the old value is a function, clone it for the transition
     if type(value) == 'function' then
-      old = luanim.signal(value)
+      old = luanim.signal(value, nil, context)
     else
       old = function() return value end
     end
 
     -- if the new value is a function, create a signal for it
     if type(newval) == 'function' then
-      new = luanim.signal(newval)
+      new = luanim.signal(newval, nil, context)
     else
       new = function() return newval end
     end

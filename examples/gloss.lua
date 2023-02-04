@@ -22,10 +22,11 @@ local function appear(scene, text, dir, delay, speed)
   local size = text.size()
   local len = measure(text.text()) * size
 
-  local mask = shapes.Rect(0, 3 * size, len, -11 * size)
+  local mask = shapes.Rect(vec2(0, -4 * size), vec2(len, 10 * size))
 
+  local start = mask.pos()
   local up = vec2(dir.x * len, dir.y * 12 * size)
-  mask.pos(up)
+  mask.pos(start + up)
 
   local old = text.pos()
   text.pos(old - up)
@@ -35,7 +36,7 @@ local function appear(scene, text, dir, delay, speed)
 
   scene:play(function (p)
     local pos = up * (1 - p)
-    mask.pos(pos)
+    mask.pos(start + pos)
     text.pos(old - pos)
   end, speed, ease_inout_cubic)
 
@@ -47,7 +48,7 @@ local function words(text, sep)
   local all = {}
   local x = 0
   for token in string.gmatch(text, "[^%s]+") do
-    table.insert(all, shapes.Text(x, 0, token))
+    table.insert(all, shapes.Text(vec2(x, 0), token))
     x = x + measure(token) + sep
   end
   return all
@@ -103,7 +104,7 @@ local function text_anim(scene, root)
   gloss.pos(vec2(-200, 0))
   root:add_child(gloss)
 
-  local translation = shapes.Text(0, 24, "'They shall celebrate him on that date.'")
+  local translation = shapes.Text(vec2(0, 24), "'They shall celebrate him on that date.'")
   gloss:add_child(translation)
 
   local delay = 0
