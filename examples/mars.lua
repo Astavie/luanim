@@ -1,11 +1,6 @@
 local luanim = require 'luanim'
 local shapes = require 'shapes'
 local vec2   = require 'vector'.vec2
-local ir     = require 'ir'
-
-local function measure(s)
-  return coroutine.yield(ir.MEASURE, s)
-end
 
 local function planet(size, name, time, r)
   local rt = math.sqrt(r)
@@ -55,7 +50,7 @@ local function scene1(scene, root)
   root:add_child(shapes.Text(
     function(text)
       -- center text
-      return vec2(-measure(text.text()) / 2, -130)
+      return vec2(-text.width() / 2, -130)
     end,
     function()
       return "Focus: " .. focused()
@@ -67,33 +62,38 @@ local function scene1(scene, root)
   scene:wait(2)
 
   -- trace to follow mars
-  local trace = shapes.Trace(mars.rootPos)
+  local trace = shapes.Trace(mars.root_pos)
   root:add_child(trace)
 
   -- wait for a full mars orbit (wait until mars is one year further)
-  local start = mars.year()
-  scene:waitUntil(mars.year, start + 1)
+  scene:wait(
+    scene:time_until(mars.year, mars.year() + 1)
+  )
 
   -- remove trace
-  scene:wait(0.5)
-  trace.width(0, 0.1)
+  trace.width(0, 0.5)
   root:remove(trace)
 
   -- change focus to earth
   focused("Earth")
   focus(earth.pos, 1)
-  scene:wait(1)
+
+  -- wait until mars is to the right of earth (same y position)
+  scene:wait(
+    scene:time_until(function() return earth.pos().y - mars.pos().y end, 0, nil, 3)
+      - 1
+  )
 
   -- add line to mars
   local line = shapes.Line(vec2(0), vec2(0))
   root:add_child(line)
-  line.vec(function() return earth:vectorTo(mars) end, 1)
+  line.vec(function() return earth:vector_to(mars) end, 1)
 
   -- put line to the side
   line:add_child(shapes.Circle(line.vec, 1.5))
 
-  scene:parallel(function() line.pos(vec2(120, -120), 1) end)
-  line.vec(function() return vec2(vec2.distance(earth.pos(), mars.pos()), 0) end, 1)
+  line.vec(function() return vec2(vec2.distance(earth.pos(), mars.pos()), 0) end)
+  line.pos(vec2(120, -120), 0.5)
 
   -- trace mars again
   trace:reset()

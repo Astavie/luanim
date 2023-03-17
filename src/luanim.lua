@@ -83,7 +83,9 @@ end
 ---
 ---@param eps? number
 ---@param max? integer
-function luanim.Scene:waitUntil(a, b, x0, x1, eps, max)
+---
+---@return number
+function luanim.Scene:time_until(a, b, x0, x1, eps, max)
   if type(a) ~= 'function' then
     local val = a
     a = function() return val end
@@ -137,7 +139,8 @@ function luanim.Scene:waitUntil(a, b, x0, x1, eps, max)
 
   -- reset time
   self.time(start)
-  self:wait(x0 - start)
+
+  return x0 - start
 end
 
 ---@alias id integer
@@ -161,14 +164,6 @@ function luanim.Scene:parallel(func, ...)
   local ret = {coroutine.resume(self.threads[id], self, ...)}
   local alive = ret[1]
   local instr = ret[2]
-
-  while alive and type(instr) == 'number' do
-      -- if we yielded an instruction, yield it back up the call stack
-      local resume = {coroutine.yield(select(2, table.unpack(ret)))}
-      ret = {coroutine.resume(self.threads[id], table.unpack(resume))}
-      alive = ret[1]
-      instr = ret[2]
-  end
 
   if alive and instr ~= nil then
     instr.start = self.time()
@@ -236,14 +231,6 @@ function luanim.advance_frame(scene, fps, prev_frame)
       local ret = {coroutine.resume(scene.threads[id])}
       local alive = ret[1]
       instr = ret[2]
-
-      while alive and type(instr) == 'number' do
-        -- if we yielded an instruction, yield it back up the call stack
-        local resume = {coroutine.yield(select(2, table.unpack(ret)))}
-        ret = {coroutine.resume(scene.threads[id], table.unpack(resume))}
-        alive = ret[1]
-        instr = ret[2]
-      end
 
       if alive and instr ~= nil then
         instr.start = scene.time()
@@ -411,10 +398,17 @@ function luanim.signal(value, definterp, context)
   end
 end
 
-function luanim.log(f, args)
+function luanim.log(f, magic, fps)
   local log = ""
   local function emit(...)
-    for i, x in ipairs({...}) do
+    local args = {...}
+
+    if args[1] == 108 then
+      log = log .. "MAGIC " .. args[7] .. "\n"
+      return
+    end
+
+    for i, x in ipairs(args) do
       if i == 1 then
         for k, v in pairs(ir) do
           if x == v then
@@ -423,26 +417,25 @@ function luanim.log(f, args)
           end
         end
       else
-        log = log .. " " .. x
+        log = log .. " " .. tostring(x)
       end
     end
     log = log .. "\n"
   end
 
-  args = args or {}
-  while true do
-    local ret = {f(table.unpack(args))}
-    if ret[1] == nil then return log end
+  emit(table.unpack(magic))
+  emit(ir.FPS, fps)
 
-    args = {}
-    if ret[1] == ir.MEASURE then
-      table.insert(args, string.len(ret[2])) -- every measurement will just be the length of the string
-    elseif ret[1] == ir.EMIT then
-      table.insert(args, emit)
-    else
-      emit(table.unpack(ret))
+  local frame = 0
+  while true do
+    emit(ir.FRAME, frame)
+    if f(frame, emit) then
+      break
     end
+    frame = frame + 1
   end
+
+  return log
 end
 
 return luanim

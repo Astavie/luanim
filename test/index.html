@@ -7,7 +7,6 @@
     <title>Luanim</title>
 </head>
 <body>
-    <p id="stdout"></p>
     <center><canvas id="canvas" width="1280" height="720" style="border:1px solid #000000;"></canvas>
     <br>
     <input type="number" id="frames" value="60">
@@ -19,7 +18,6 @@
     <script type="module">
         import { LuaFactory } from "./wasmoon/index.js"
 
-        const stdout = document.getElementById("stdout")
         const canvas = document.getElementById("canvas")
         const script = document.getElementById("script")
         const button = document.getElementById("button")
@@ -27,9 +25,6 @@
         const frames = document.getElementById("frames")
         const speedo = document.getElementById("speedo")
         const ctx = canvas.getContext("2d")
-
-        ctx.fillStyle = "white"
-        ctx.strokeStyle = "white"
 
         button.addEventListener('click', run)
 
@@ -48,8 +43,6 @@
                 resolve()
             }
 
-            stdout.innerText = ""
-
             const start = Date.now()
             const print = text => {
                 const now = Date.now()
@@ -57,7 +50,6 @@
                 console.log(`[${diff}] ${text}\n`)
             }
 
-            let clip = false
             let lastx, lasty
 
             const factory = new LuaFactory("./wasmoon/glue.wasm")
@@ -66,10 +58,37 @@
             await factory.mountFile("shapes.lua", await (await fetch("./lua/shapes.lua")).text())
             await factory.mountFile("vector.lua", await (await fetch("./lua/vector.lua")).text())
             await factory.mountFile("tweens.lua", await (await fetch("./lua/tweens.lua")).text())
-            const lua = await factory.createEngine()
 
+            const lua = await factory.createEngine()
             const thread = lua.global.newThread()
             const threadIndex = lua.global.getTop()
+
+            const measure = (text, font) => {
+                return ctx.measureText(text).width
+            }
+
+            const preferred_fps = () => {
+                return frames.value / speedo.value
+            }
+
+            const fpCanvas = thread.lua.module.addFunction((address) => {
+                thread.lua.lua_createtable(address, 0, 0)
+
+                thread.lua.lua_pushstring(address, "preferred_fps")
+                thread.pushValue(preferred_fps)
+                thread.lua.lua_settable(address, -3)
+
+                thread.lua.lua_pushstring(address, "measure")
+                thread.pushValue(measure)
+                thread.lua.lua_settable(address, -3)
+                return 1
+            }, 'ii')
+
+            thread.lua.luaL_requiref(thread.address, "canvas", fpCanvas, 0)
+            thread.lua.lua_settop(thread.address, -2)
+
+            let line_trans = [1, 0, 0, 1, 0, 0];
+            let fill_trans;
 
             const draw = (buffer, size) => {
                 let index = 0
@@ -87,65 +106,79 @@
                         return s
                     }
 
-                    const instr = num(0)
-                    switch (instr) {
-                        case 2: // TRANSFORM
-                            ctx.resetTransform()
-                            ctx.translate(canvas.width / 2, canvas.height / 2)
-                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
-                            ctx.transform(num(1), num(2), num(3), num(4), num(5), num(6))
+                    switch (num(0)) {
+                        case 0: // OBJECT
+                            ctx.save()
+                            ctx.transform(num(3), num(4), num(5), num(6), num(7), num(8))
+                            break
+                        case 1: // END
+                            ctx.restore()
                             break
                         case 3: // LINE WIDTH
                             ctx.lineWidth = num(1)
                             break
-                        case 4: // CLIP START
-                            ctx.save()
-                            ctx.beginPath()
-                            clip = true
-                            break
-                        case 5: // CLIP PUSH
-                            clip = false
-                            ctx.clip()
-                            break
-                        case 6: // CLIP POP
-                            ctx.restore()
-                            break
                         case 7: // PATH START
-                            if (!clip) ctx.beginPath()
-                            lastx = num(1)
-                            lasty = num(2)
+                            {
+                            fill_trans = ctx.getTransform()
+                            const m = fill_trans
+                            const x = num(1)
+                            const y = num(2)
+
+                            ctx.save()
+                            ctx.setTransform(...line_trans)
+                            ctx.beginPath()
+                            lastx = m.a * x + m.c * y + m.e
+                            lasty = m.b * x + m.d * y + m.f
                             ctx.moveTo(lastx, lasty)
+                            }
                             break
                         case 9: // LINE
-                            ctx.lineTo(num(1), num(2))
+                            {
+                            const m = fill_trans
+                            const x = num(1)
+                            const y = num(2)
+                            ctx.lineTo(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f)
+                            }
                             break
                         case 10: // CLOSE PATH
                             ctx.lineTo(lastx, lasty)
                             break
                         case 20: // END PATH
-                            if (!clip) ctx.stroke()
+                            ctx.stroke()
+                            ctx.restore()
                             break
                         case 11: // RECTANGLE
-                            if (!clip) ctx.beginPath()
+                            ctx.beginPath()
                             ctx.rect(num(1), num(2), num(3), num(4))
-                            if (!clip) ctx.fill()
+                            ctx.fill()
                             break
                         case 13: // TEXT
-                            if (clip) return // no clip for text
-                            ctx.fillText(str(3), num(1), num(2))
+                            ctx.save()
+                            ctx.scale(num(3), num(3))
+                            ctx.fillText(str(4), num(1), num(2))
+                            ctx.restore()
                             break
-                        case 17: // IDENTITY
-                            ctx.resetTransform()
-                            ctx.translate(canvas.width / 2, canvas.height / 2)
-                            ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                        case 4: // POINT
+                            {
+                            const m = ctx.getTransform()
+                            const x = num(1)
+                            const y = num(2)
+
+                            ctx.save()
+                            ctx.setTransform(...line_trans)
+                            ctx.beginPath()
+                            ctx.arc(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f, num(3), 0, 2 * Math.PI)
+                            ctx.fill()
+                            ctx.restore()
+                            }
                             break
                         case 19: // CIRCLE
-                            if (!clip) ctx.beginPath()
+                            ctx.beginPath()
                             ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
-                            if (!clip) ctx.fill()
+                            ctx.fill()
                             break
                         default:
-                            print("UNKNOWN " + instr)
+                            print("UNKNOWN " + num(0))
                             break
                     }
                 }
@@ -155,92 +188,57 @@
             const fpEmit = thread.lua.module._luanim_emitter(fpDraw)
 
             try {
-                // open script
-                thread.loadString(script.value)
-                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, -1, 0, 0, null))
-
                 // load emit function
                 thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
 
-                // loop
-                let args = 1
-                let func = thread.lua.lua_gettop(thread.address)
-                thread.lua.lua_pushvalue(thread.address, -2)
-                thread.lua.lua_pushnumber(thread.address, frames.value / speedo.value)
+                // open script
+                thread.loadString(script.value)
+                thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, 1, 0, 0, null))
 
-                const num = (i) => thread.lua.luaL_checknumber (thread.address, func + 1 + i)
-                const str = (i) => thread.lua.luaL_checklstring(thread.address, func + 1 + i)
-                const pop = () => {
-                    thread.lua.lua_settop(thread.address, func)
-                    thread.lua.lua_pushvalue(thread.address, -2)
-                }
+                // loop
+                let frame = 0
 
                 await new Promise(r => {
                     resolve = r
-                    const frame = () => {
-                        ctx.save()
+
+                    const f = () => {
                         ctx.fillStyle = "black"
                         ctx.resetTransform()
                         ctx.beginPath()
                         ctx.rect(0, 0, canvas.width, canvas.height)
                         ctx.fill()
-                        ctx.restore()
 
-                        while (true) {
-                            thread.assertOk(thread.lua.lua_pcallk(thread.address, args, -1, 0, 0, null))
+                        ctx.fillStyle = "white"
+                        ctx.strokeStyle = "white"
+                        ctx.translate(canvas.width / 2, canvas.height / 2)
+                        ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
 
-                            if (thread.lua.lua_gettop(thread.address) == func) {
-                                // the end
-                                if (interval) clearInterval(interval)
-                                interval = undefined
-                                resolve()
-                                return
-                            }
+                        thread.lua.lua_pushvalue(thread.address, -1)
+                        thread.lua.lua_pushnumber(thread.address, frame)
+                        thread.lua.lua_pushvalue(thread.address, -4)
 
-                            const params = thread.lua.lua_gettop(thread.address) - func
-                            const instr = num(0)
-                            args = 0
+                        thread.assertOk(thread.lua.lua_pcallk(thread.address, 2, 1, 0, 0, null))
+                        thread.lua.module._luanim_draw()
 
-                            switch (instr) {
-                                case 0: // MAGIC
-                                    pop()
-                                    thread.lua.lua_pushnumber(thread.address, frames.value / speedo.value)
-                                    args = 1
-                                    break
-                                case 1: // FRAME
-                                    pop()
-                                    thread.lua.module._luanim_draw()
-                                    return
-                                case 14: // MEASURE
-                                    const width = ctx.measureText(str(1)).width
-                                    pop()
-                                    thread.lua.lua_pushnumber(thread.address, width)
-                                    args = 1
-                                    break
-                                case 16: // FPS
-                                    if (interval) clearInterval(interval)
-                                    interval = setInterval(frame, 1000 / num(1) / speedo.value)
-                                    pop()
-                                    break
-                                case 21: // EMIT
-                                    pop()
-                                    thread.lua.lua_pushvalue(thread.address, -2)
-                                    args = 1
-                                    break
-                                default:
-                                    // Call the emit function
-                                    thread.lua.lua_pcallk(thread.address, params, -1, 0, 0, null)
-                                    thread.lua.lua_pushcclosure(thread.address, fpEmit, 0)
-                                    pop()
-                                    break
-                            }
+                        const done = thread.lua.lua_toboolean(thread.address, -1)
+                        thread.pop()
+
+                        if (done) {
+                            // the end
+                            if (interval) clearInterval(interval)
+                            interval = undefined
+                            resolve()
+                        } else {
+                            frame += 1
                         }
                     }
-                    frame()
+                    f()
+                    interval = setInterval(f, 1000 / frames.value)
                 })
             } finally {
                 thread.lua.module._luanim_draw()
-                thread.lua.module.removeFunction(fpEmit)
+                thread.lua.module.removeFunction(fpDraw)
+                thread.lua.module.removeFunction(fpCanvas)
                 lua.global.close()
                 lua.global.remove(threadIndex)
             }
