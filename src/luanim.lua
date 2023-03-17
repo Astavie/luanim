@@ -86,11 +86,11 @@ end
 ---
 ---@return number
 function luanim.Scene:time_until(a, b, x0, x1, eps, max)
-  if type(a) ~= 'function' then
+  if not luanim.is_function(a) then
     local val = a
     a = function() return val end
   end
-  if type(b) ~= 'function' then
+  if not luanim.is_function(b) then
     local val = b
     b = function() return val end
   end
@@ -291,6 +291,16 @@ function luanim.computed(value, context)
   return function() return signal() end
 end
 
+function luanim.is_function(v)
+  if type(v) == 'function' then
+    return true
+  elseif type(v) == 'table' then
+    return getmetatable(v).__call ~= nil
+  else
+    return false
+  end
+end
+
 ---@generic T
 ---@generic C
 ---@param value signalValue<T, C>
@@ -305,97 +315,108 @@ function luanim.signal(value, definterp, context)
     dependents = {},
   }
 
-  if type(value) ~= 'function' then
+  if not luanim.is_function(value) then
     signal.cache = value
   end
 
-  return function(newval, time, easing, interp)
-    -- GET VALUE --
-    if newval == nil or parentSignal ~= nil then
-      if parentSignal ~= nil then
-        -- update dependencies
-        parentSignal.dependencies[signal] = signal
-        signal.dependents[parentSignal] = parentSignal
+  local out = {}
+  setmetatable(out, {
+    __index = function(_, key)
+      -- GET INNER VALUE --
+      return luanim.computed(function()
+        return out()[key]
+      end)
+    end,
+    __call = function(_, newval, time, easing, interp)
+      -- GET VALUE --
+      if newval == nil or parentSignal ~= nil then
+        if parentSignal ~= nil then
+          -- update dependencies
+          parentSignal.dependencies[signal] = signal
+          signal.dependents[parentSignal] = parentSignal
+        end
+
+        if signal.cache == nil then
+          -- value must be invalidated
+          -- remove dependencies
+          for k, _ in pairs(signal.dependencies) do
+            k.dependents[signal] = nil
+          end
+          signal.dependencies = {}
+
+          if luanim.is_function(value) then
+            local parent = parentSignal
+            parentSignal = signal
+            signal.cache = value(context)
+            parentSignal = parent
+          else
+            signal.cache = value
+          end
+        end
+
+        return signal.cache
       end
 
-      if signal.cache == nil then
-        -- value must be invalidated
-        -- remove dependencies
-        for k, _ in pairs(signal.dependencies) do
-          k.dependents[signal] = nil
-        end
-        signal.dependencies = {}
+      -- SET VALUE --
+      if newval == value then
+        return
+      end
 
-        if type(value) == 'function' then
-          local parent = parentSignal
-          parentSignal = signal
-          signal.cache = value(context)
-          parentSignal = parent
+      -- remove dependencies
+      for k, _ in pairs(signal.dependencies) do
+        k.dependents[signal] = nil
+      end
+      signal.dependencies = {}
+
+      time = time or 0
+      if time == 0 then
+        -- static value
+        value = newval
+        if luanim.is_function(value) then
+          signal.cache = nil
         else
           signal.cache = value
         end
+        invalidate(signal)
+        return
       end
 
-      return signal.cache
-    end
+      interp = interp or definterp
+      local oldval = value
+      local old, new
 
-    -- SET VALUE --
-    if newval == value then
-      return
-    end
-
-    -- remove dependencies
-    for k, _ in pairs(signal.dependencies) do
-      k.dependents[signal] = nil
-    end
-    signal.dependencies = {}
-
-    time = time or 0
-    if time == 0 then
-      -- static value
-      value = newval
-      if type(value) ~= 'function' then
-        signal.cache = value
+      -- if the old value is a function, clone it for the transition
+      if luanim.is_function(oldval) then
+        old = luanim.signal(oldval, nil, context)
       else
+        old = function() return oldval end
+      end
+
+      -- if the new value is a function, create a signal for it
+      if luanim.is_function(newval) then
+        new = luanim.signal(newval, nil, context)
+      else
+        new = function() return newval end
+      end
+
+      coroutine.yield({ duration = time, easing = easing, anim = function (p)
+        value = interp(old(), new(), p)
+        signal.cache = value
+        invalidate(signal)
+      end })
+
+      -- set value
+      value = newval
+      if luanim.is_function(value) then
         signal.cache = nil
+      else
+        signal.cache = value
       end
       invalidate(signal)
-      return
     end
+  })
 
-    interp = interp or definterp
-    local oldval = value
-    local old, new
-
-    -- if the old value is a function, clone it for the transition
-    if type(value) == 'function' then
-      old = luanim.signal(oldval, nil, context)
-    else
-      old = function() return oldval end
-    end
-
-    -- if the new value is a function, create a signal for it
-    if type(newval) == 'function' then
-      new = luanim.signal(newval, nil, context)
-    else
-      new = function() return newval end
-    end
-
-    coroutine.yield({ duration = time, easing = easing, anim = function (p)
-      value = interp(old(), new(), p)
-      signal.cache = value
-      invalidate(signal)
-    end })
-
-    -- set value
-    value = newval
-    if type(value) ~= 'function' then
-      signal.cache = value
-    else
-      signal.cache = nil
-    end
-    invalidate(signal)
-  end
+  return out
 end
 
 function luanim.log(f, magic, fps)

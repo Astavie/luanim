@@ -80,7 +80,7 @@ local function scene1(scene, root)
 
   -- wait until mars is to the right of earth (same y position)
   scene:wait(
-    scene:time_until(function() return earth.pos().y - mars.pos().y end, 0, nil, 3)
+    scene:time_until(earth.pos.y, mars.pos.y, nil, 2)
       - 1
   )
 
