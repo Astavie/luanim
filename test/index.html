@@ -54,6 +54,7 @@
 
             const factory = new LuaFactory("./wasmoon/glue.wasm")
             await factory.mountFile("ir.lua", await (await fetch("./lua/ir.lua")).text())
+            await factory.mountFile("signal.lua", await (await fetch("./lua/signal.lua")).text())
             await factory.mountFile("luanim.lua", await (await fetch("./lua/luanim.lua")).text())
             await factory.mountFile("shapes.lua", await (await fetch("./lua/shapes.lua")).text())
             await factory.mountFile("vector.lua", await (await fetch("./lua/vector.lua")).text())

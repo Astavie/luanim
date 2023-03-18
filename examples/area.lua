@@ -1,11 +1,11 @@
-local luanim = require 'luanim'
+local signal = require 'signal'
 local shapes = require 'shapes'
 local vec2   = require 'vector'.vec2
 
 local function test(scene, root)
   local circle = shapes.Circle(vec2(0, -200), 10)
 
-  local area = luanim.signal(function()
+  local area = signal(function()
     return math.pi * circle.radius() * circle.radius()
   end)
 
@@ -26,4 +26,4 @@ local function test(scene, root)
   circle.pos(vec2(0, 300), 2)
 end
 
-return shapes.loop(test)
+return shapes.start(test)

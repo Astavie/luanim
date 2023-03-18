@@ -1,3 +1,4 @@
+local signal = require 'signal'
 local luanim = require 'luanim'
 local tweens = require 'tweens'
 local vector = require 'vector'
@@ -136,19 +137,19 @@ function shapes.Shape.new(pos, value, metatable)
     children = {},
   }
 
-  shape.pos   = luanim.signal(pos or vec2(0, 0), nil, shape, vec2)
-  shape.angle = luanim.signal(0, nil, shape, vec2)
-  shape.scale = luanim.signal(vec2(1, 1), nil, shape, vec2)
+  shape.pos   = signal.signal(pos or vec2(0, 0), nil, shape, vec2)
+  shape.angle = signal.signal(0, nil, shape, vec2)
+  shape.scale = signal.signal(vec2(1, 1), nil, shape, vec2)
 
-  shape.transform = luanim.computed(transform, shape, mat3)
-  shape.inverse   = luanim.computed(inverse, shape, mat3)
+  shape.transform = signal.computed(transform, shape, mat3)
+  shape.inverse   = signal.computed(inverse, shape, mat3)
 
-  shape.root_transform = luanim.computed(root_transform, shape, mat3)
-  shape.root_inverse   = luanim.computed(root_inverse, shape, mat3)
-  shape.root_pos       = luanim.computed(root_pos, shape, vec2)
+  shape.root_transform = signal.computed(root_transform, shape, mat3)
+  shape.root_inverse   = signal.computed(root_inverse, shape, mat3)
+  shape.root_pos       = signal.computed(root_pos, shape, vec2)
 
   for k, v in pairs(value or {}) do
-    shape[k] = luanim.signal(v, nil, shape, vec2)
+    shape[k] = signal.signal(v, nil, shape, vec2)
   end
 
   setmetatable(shape, metatable)
@@ -307,8 +308,8 @@ function shapes.PointCloud.new(point, min, max, radius, lineWidth)
 
   local cloud = shapes.Shape(nil, value, shapes.PointCloud)
   cloud.point = point
-  cloud.min = luanim.signal(min, tweens.interp.integer, cloud)
-  cloud.max = luanim.signal(max, tweens.interp.integer, cloud)
+  cloud.min = signal.signal(min, tweens.interp.integer, cloud)
+  cloud.max = signal.signal(max, tweens.interp.integer, cloud)
   return cloud
 end
 
@@ -448,7 +449,7 @@ end
 ---@nodiscard
 function shapes.Pointer.new(shape, max)
   local ptr = shapes.Shape(nil, nil, shapes.Pointer)
-  ptr.iterations = luanim.signal(max or 1, tweens.interp.integer, ptr)
+  ptr.iterations = signal.signal(max or 1, tweens.interp.integer, ptr)
   ptr.shape = shape
   return ptr
 end
@@ -462,7 +463,7 @@ end
 shapes.Text = shapes.newshape()
 
 ---@param self Text
-function shapes.Text:center()
+function shapes.Text:centered()
   return -self.width() / 2
 end
 
@@ -483,8 +484,8 @@ function shapes.Text.new(pos, text, size)
     size = size or 1,
   }, shapes.Text)
 
-  txt.width = luanim.computed(function (text)
-    return canvas.measure(text.text()) * text.size()
+  txt.width = signal.computed(function (self)
+    return canvas.measure(self.text()) * self.size()
   end, txt)
 
   return txt
@@ -542,19 +543,6 @@ end
 function shapes.start(func, cont)
   local co = coroutine.wrap(shapes.play)
   co(func, cont)
-  return co
-end
-
-local function loop(func)
-  while true do
-    shapes.play(func)
-  end
-end
-
----@param func fun(scene: Scene, root: Shape)
-function shapes.loop(func)
-  local co = coroutine.wrap(loop)
-  co(func)
   return co
 end
 

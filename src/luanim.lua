@@ -1,5 +1,5 @@
 local ir = require 'ir'
-local tweens = require 'tweens'
+local signal = require 'signal'
 
 local luanim = {}
 
@@ -180,7 +180,7 @@ end
 function luanim.Scene.new()
   ---@type Scene
   local scene = {
-    time = luanim.signal(0),
+    time = signal.signal(0),
     refs = {},
     threads = {},
     queued = {},
@@ -205,9 +205,6 @@ local function end_frame(instr, frame_time)
   return math.floor((instr.start + instr.duration) / frame_time)
 end
 
-local signal_parent
-local signal_readonly = false
-
 ---@param scene Scene
 ---@param fps   number
 ---@return boolean
@@ -227,9 +224,8 @@ function luanim.advance_frame(scene, fps, prev_frame)
 
       -- calculate animation at end
       if instr.anim ~= nil then
-        signal_readonly = true
+        signal.lock(instr.anim, 1)
         instr.anim(1)
-        signal_readonly = false
       end
 
       -- resume coroutine
@@ -253,9 +249,8 @@ function luanim.advance_frame(scene, fps, prev_frame)
       local p = (scene.time() - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
 
-      signal_readonly = true
+      signal.lock(instr.anim, p)
       instr.anim(p)
-      signal_readonly = false
     end
 
     ::loop_end::
@@ -276,300 +271,6 @@ function luanim.advance_frame(scene, fps, prev_frame)
   return hasNext
 end
 
----@alias interp<T>         fun(a: T, b: T, p: number): T
----@alias signalValue<T, C> T | fun(ctx: C): T
----@alias signal<T, C>      fun(value?: signalValue<T, C>, time?: number, easing?: easing, interp?: interp<T>): T
-
-local function invalidate(signal)
-  for k, _ in pairs(signal.dependents) do
-    k.cache = nil
-    invalidate(k)
-  end
-end
-
----@generic T
----@generic C
----@param value signalValue<T, C>
----@param context? C
----@param default? table
----@return fun(): T
-function luanim.computed(value, context, default)
-  local signal = luanim.signal(value, nil, context, default)
-  local meta = getmetatable(signal)
-  local out = meta.__call
-
-  function meta:__call()
-    return out()
-  end
-
-  function meta:__index(key)
-    -- first check if this is a method
-    local mtbl = getmetatable(out())
-    local method
-    if type(mtbl.__index) == 'table' then
-      method = mtbl.__index[key]
-    else
-      method = mtbl:__index(key)
-    end
-    if type(method) == 'function' then
-      return luanim.bind_function(method)
-    end
-
-    return luanim.computed(function()
-      return out()[key]
-    end)
-  end
-
-  return signal
-end
-
-function luanim.is_callable(v)
-  if type(v) == 'function' then
-    return true
-  elseif type(v) == 'table' then
-    return getmetatable(v).__call ~= nil
-  else
-    return false
-  end
-end
-
-local optable = {}
-function optable.__add(a, b)    return a + b end
-function optable.__sub(a, b)    return a - b end
-function optable.__mul(a, b)    return a * b end
-function optable.__div(a, b)    return a / b end
-function optable.__unm(a)       return -a end
-function optable.__mod(a, b)    return a % b end
-function optable.__pow(a, b)    return a ^ b end
-function optable.__idiv(a, b)   return a // b end
-function optable.__band(a, b)   return a & b end
-function optable.__bor(a, b)    return a | b end
-function optable.__bxor(a, b)   return a ~ b end
-function optable.__bnot(a)      return ~a end
-function optable.__shl(a, b)    return a << b end
-function optable.__shr(a, b)    return a >> b end
-function optable.__concat(a, b) return a .. b end
-
-local metametatable = {}
-function metametatable:__index(key)
-
-  -- metatable method
-  return function(rawa, rawb)
-
-    -- get values
-    local a, b
-    if luanim.is_callable(rawa) then
-      a = rawa
-    else
-      a = function() return rawa end
-    end
-    if luanim.is_callable(rawb) then
-      b = rawb
-    else
-      b = function() return rawb end
-    end
-
-    -- signal view
-    return luanim.computed(function()
-      -- perform operation
-      local value = a()
-      local meta = getmetatable(value) or optable
-      local method = meta[key] or optable[key]
-      return method(value, b())
-    end)
-
-  end
-end
-
-local function extendmetatable(mtbl)
-  setmetatable(mtbl, metametatable)
-  mtbl.__add = mtbl.__add
-  mtbl.__sub = mtbl.__sub
-  mtbl.__mul = mtbl.__mul
-  mtbl.__div = mtbl.__div
-  mtbl.__unm = mtbl.__unm
-  mtbl.__mod = mtbl.__mod
-  mtbl.__pow = mtbl.__pow
-  mtbl.__idiv = mtbl.__idiv
-  mtbl.__band = mtbl.__band
-  mtbl.__bor = mtbl.__bor
-  mtbl.__bxor = mtbl.__bxor
-  mtbl.__bnot = mtbl.__bnot
-  mtbl.__shl = mtbl.__shl
-  mtbl.__shr = mtbl.__shr
-  mtbl.__concat = mtbl.__concat
-  setmetatable(mtbl, nil)
-end
-
----@generic T
----@param func fun(...): T
----@return fun(...: signalValue<any, nil>): fun(): T
-function luanim.bind_function(func)
-  return function(...)
-    local funcs = {}
-    for i, v in ipairs({...}) do
-      if luanim.is_callable(v) then
-        funcs[i] = v
-      else
-        funcs[i] = function() return v end
-      end
-    end
-    return luanim.computed(function()
-      local values = {}
-      for i, v in ipairs(funcs) do
-        values[i] = v()
-      end
-      return func(table.unpack(values))
-    end)
-  end
-end
-
----@generic T
----@generic C
----@param value signalValue<T, C>
----@param definterp? interp<T>
----@param context? C
----@param default? table
----@return signal<T, C>
-function luanim.signal(value, definterp, context, default)
-  definterp = definterp or tweens.interp.linear
-
-  local empty = {}
-  setmetatable(empty, default)
-
-  local signal = {
-    dependencies = {},
-    dependents = {},
-    value = function() return empty end,
-    cache = empty,
-  }
-
-  local out = {}
-  function out:locked()
-    local locked = signal.value
-    return function() return locked(context) end
-  end
-
-  local metatable = {}
-  function metatable:__index(key)
-    -- first check if this is a method
-    local mtbl = getmetatable(out())
-    local method
-    if type(mtbl.__index) == 'table' then
-      method = mtbl.__index[key]
-    else
-      method = mtbl:__index(key)
-    end
-    if type(method) == 'function' then
-      return luanim.bind_function(method)
-    end
-
-    -- GET INNER VALUE --
-    return luanim.computed(function()
-      return out()[key]
-    end)
-  end
-  function metatable:__call(newval, time, easing, interp)
-    -- GET VALUE --
-    if newval == nil or signal_readonly then
-      if signal_parent ~= nil then
-        -- update dependencies
-        signal_parent.dependencies[signal] = signal
-        signal.dependents[signal_parent] = signal_parent
-      end
-
-      if signal.cache == nil then
-        -- value must be invalidated
-        -- remove dependencies
-        for k, _ in pairs(signal.dependencies) do
-          k.dependents[signal] = nil
-        end
-        signal.dependencies = {}
-
-        local oldparent   = signal_parent
-        local oldreadonly = signal_readonly
-
-        signal_parent = signal
-        signal_readonly = true
-        signal.cache = signal.value(context)
-        signal_readonly = oldreadonly
-        signal_parent = oldparent
-      end
-
-      return signal.cache
-    end
-
-    -- SET VALUE --
-    -- check for compound
-    if type(newval) == 'table' and getmetatable(newval) == nil then
-      local funcs = {}
-      local mtbl = getmetatable(out())
-      for k, v in pairs(newval) do
-        if luanim.is_callable(v) then
-          funcs[k] = v
-        else
-          funcs[k] = function() return v end
-        end
-      end
-      out(function(ctx)
-        local compound = {}
-        setmetatable(compound, mtbl)
-        for k, v in pairs(funcs) do
-          compound[k] = v(ctx)
-        end
-        return compound
-      end, time, easing, interp)
-      return
-    end
-
-    -- remove dependencies
-    for k, _ in pairs(signal.dependencies) do
-      k.dependents[signal] = nil
-    end
-    signal.dependencies = {}
-
-    time = time or 0
-    if time == 0 then
-      -- static value
-      if luanim.is_callable(newval) then
-        signal.value = newval
-        signal.cache = nil
-      else
-        signal.value = function() return newval end
-        signal.cache = newval
-      end
-      invalidate(signal)
-      return
-    end
-
-    interp = interp or definterp
-    local old = signal.value
-
-    local new
-    if luanim.is_callable(newval) then
-      new = newval
-    else
-      new = function() return newval end
-    end
-
-    coroutine.yield({ duration = time, easing = easing, anim = function (p)
-      local v = interp(old(context), new(context), p)
-      signal.value = function() return v end
-      signal.cache = v
-      invalidate(signal)
-    end })
-
-    -- set value
-    out(newval)
-  end
-
-  extendmetatable(metatable)
-  setmetatable(out, metatable)
-
-  -- set value
-  out(value)
-  return out
-end
 
 function luanim.log(f, magic, fps)
   local log = ""

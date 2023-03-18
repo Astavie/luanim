@@ -1,4 +1,4 @@
-local luanim = require 'luanim'
+local signal = require 'signal'
 local shapes = require 'shapes'
 local vec2   = require 'vector'.vec2
 
@@ -23,12 +23,12 @@ end
 
 local function scene1(scene, root)
   -- basic shapes
-  local time = luanim.signal(0)
+  local time = signal(0)
   local earth = planet(3, "Earth", time, 1)
   local mars = planet(1.5, "Mars", time, 1.52368055)
 
   -- camera focus point
-  local focus = luanim.signal(vec2(0))
+  local focus = signal(vec2(0))
   local camera = shapes.Shape(-focus)
 
   -- add children
@@ -38,10 +38,10 @@ local function scene1(scene, root)
   root:add_child(camera)
 
   -- focus text
-  local focused = luanim.signal("Sun")
+  local focused = signal("Sun")
 
   root:add_child(shapes.Text({
-    x = shapes.Text.center,
+    x = shapes.Text.centered,
     y = -130
   }, "Focus: " .. focused ))
 
@@ -100,7 +100,7 @@ local function scene1(scene, root)
   ))
 
   -- graph
-  local vert = luanim.signal(0)
+  local vert = signal(0)
 
   line:add_child(
     shapes.Shape({
