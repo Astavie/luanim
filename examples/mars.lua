@@ -8,14 +8,10 @@ local function planet(size, name, time, r, offset)
   local period = rt * rt * rt
   if period == 0 then period = 1 end
 
-  local p = shapes.Circle(
-    function(self)
-      local x = 50 * r * math.cos(self.year() * 2 * math.pi)
-      local y = 50 * r * math.sin(self.year() * 2 * math.pi)
-      return vec2(x, y)
-    end,
-    size
-  )
+  local p = shapes.Circle({
+    x = 50 * r * (signal.me.year * 2 * math.pi):cos(),
+    y = 50 * r * (signal.me.year * 2 * math.pi):sin()
+  }, size)
 
   p.year = time / period - offset
   p.orbital_radius = r
@@ -57,7 +53,7 @@ local function scene1(scene, root)
   local focused = signal("Sun")
 
   root:add_child(shapes.Text({
-    x = shapes.Text.centered,
+    x = -signal.me.width / 2,
     y = -130
   }, "Focus: " .. focused ))
 

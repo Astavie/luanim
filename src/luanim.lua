@@ -10,6 +10,7 @@ local luanim = {}
 ---@field easing?   easing
 
 ---@class Scene
+---@field clock fun(): seconds
 ---@field package time      signal<seconds, nil>
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
@@ -22,12 +23,6 @@ luanim.Scene.__index = luanim.Scene;
 ---@param time seconds
 function luanim.Scene:wait(time)
   coroutine.yield({ start = self.time, duration = time })
-end
-
----@param self Scene
----@return seconds
-function luanim.Scene:clock()
-  return self.time()
 end
 
 ---@param self Scene
@@ -188,6 +183,7 @@ function luanim.Scene.new()
     to_remove = {},
     nextid = 0,
   }
+  scene.clock = signal.bind(scene.time)
 
   setmetatable(scene, luanim.Scene)
   return scene

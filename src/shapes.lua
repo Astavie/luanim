@@ -143,12 +143,12 @@ function shapes.Shape.new(pos, value, metatable)
   shape.angle = signal.signal(0, nil, shape, vec2)
   shape.scale = signal.signal(vec2(1, 1), nil, shape, vec2)
 
-  shape.transform = signal.computed(transform, shape, mat3)
-  shape.inverse   = signal.computed(inverse, shape, mat3)
+  shape.transform = signal.bind(transform, shape, mat3)
+  shape.inverse   = signal.bind(inverse, shape, mat3)
 
-  shape.root_transform = signal.computed(root_transform, shape, mat3)
-  shape.root_inverse   = signal.computed(root_inverse, shape, mat3)
-  shape.root_pos       = signal.computed(root_pos, shape, vec2)
+  shape.root_transform = signal.bind(root_transform, shape, mat3)
+  shape.root_inverse   = signal.bind(root_inverse, shape, mat3)
+  shape.root_pos       = signal.bind(root_pos, shape, vec2)
 
   for k, v in pairs(value or {}) do
     shape[k] = signal.signal(v, nil, shape, vec2)
@@ -168,7 +168,7 @@ end
 ---@param self Shape
 ---@param shape Shape
 ---@return fun(): vec2
-function shapes.Shape:computed_vector_to(shape)
+function shapes.Shape:lifted_vector_to(shape)
   return self.root_inverse * shape.root_pos
 end
 
@@ -465,11 +465,6 @@ end
 shapes.Text = shapes.newshape()
 
 ---@param self Text
-function shapes.Text:centered()
-  return -self.width() / 2
-end
-
----@param self Text
 ---@param emit fun(...)
 function shapes.Text:draw(emit)
   emit(ir.TEXT, 0, 0, self.size(), self.text())
@@ -486,7 +481,7 @@ function shapes.Text.new(pos, text, size)
     size = size or 1,
   }, shapes.Text)
 
-  txt.width = signal.computed(function (self)
+  txt.width = signal.bind(function (self)
     return canvas.measure(self.text()) * self.size()
   end, txt)
 
