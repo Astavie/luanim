@@ -201,10 +201,7 @@ function shapes.newshape()
   local shape = {}
   setmetatable(shape, { __call = function(self, ...) return self.new(...) end })
   function shape:__index(key)
-    if shape[key] ~= nil then
-      return shape[key]
-    end
-    return shapes.Shape[key]
+    return shape[key] or shapes.Shape[key]
   end
   return shape
 end
@@ -523,7 +520,10 @@ function shapes.play(func, cont)
 
     while target_frame > frame do
       -- fast-forward
-      if not luanim.advance_frame(scene, fps, frame) and not cont then
+
+      local ok, res = xpcall(luanim.advance_frame, scene.onerr, scene, fps, frame)
+
+      if not ok or (not res and not cont) then
         done = true
         frame = target_frame
       else
@@ -538,6 +538,7 @@ end
 ---@param func fun(scene: Scene, root: Shape)
 ---@param cont? boolean
 function shapes.start(func, cont)
+
   local co = coroutine.wrap(shapes.play)
   co(func, cont)
   return co

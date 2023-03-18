@@ -108,7 +108,6 @@ function signal.me: __index(key)
 end
 
 ---@generic T
----@generic C
 ---@param value fun(...): T
 ---@return fun(): T
 function signal.bind(value, ...)

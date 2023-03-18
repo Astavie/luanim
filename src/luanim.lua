@@ -147,6 +147,10 @@ function luanim.Scene:terminate(id)
   table.insert(self.to_remove, id)
 end
 
+function luanim.Scene.onerr(...)
+  print(debug.traceback(...))
+end
+
 ---@param self Scene
 ---@param func fun(scene: Scene, ...: any)
 ---@param ... any
@@ -155,13 +159,15 @@ function luanim.Scene:parallel(func, ...)
   local id = self.nextid
   self.nextid = self.nextid + 1
 
-  self.threads[id] = coroutine.create(func);
+  self.threads[id] = coroutine.create(function(...)
+    return xpcall(func, self.onerr, ...)
+  end);
 
   local ret = {coroutine.resume(self.threads[id], self, ...)}
   local alive = ret[1]
   local instr = ret[2]
 
-  if alive and instr ~= nil then
+  if alive and type(instr) == 'table' then
     instr.start = self.time()
     self.queued[id] = instr
   else
@@ -229,7 +235,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
       local alive = ret[1]
       instr = ret[2]
 
-      if alive and instr ~= nil then
+      if alive and type(instr) == 'table' then
         instr.start = scene.time()
         scene.queued[id] = instr
       else
