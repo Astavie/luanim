@@ -41,14 +41,21 @@ end
 
 ---@generic T
 ---@generic C
----@param signal signal<T, C>
----@param func fun(prev: T, delta: number, ctx: C): T
-function luanim.Scene:advance(signal, func)
+---@param sg signal<T, C>
+---@param func T | fun(prev: T, delta: number, ctx: C): T
+function luanim.Scene:advance(sg, func)
 
-  local prev = signal()
+  if type(func) ~= 'function' then
+    local speed = func
+    func = function(last, delta)
+      return last + delta * speed
+    end
+  end
+
+  local prev = sg()
   local time = self:clock()
 
-  signal(function(ctx)
+  sg(function(ctx)
     local delta = self:clock() - time
     prev = func(prev, delta, ctx)
     time = self:clock()

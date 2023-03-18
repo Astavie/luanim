@@ -46,7 +46,7 @@ local function scene1(scene, root)
   }, "Focus: " .. focused ))
 
   -- start advancing time
-  scene:advance(time, function(last, delta) return last + delta / 3 end)
+  scene:advance(time, 1 / 3)
   scene:wait(2)
 
   -- trace to follow mars
@@ -56,6 +56,7 @@ local function scene1(scene, root)
   -- wait for a full mars orbit (wait until mars is one year further)
   scene:wait(
     scene:time_until(mars.year, mars.year() + 1)
+      - 0.5
   )
 
   -- remove trace
@@ -68,7 +69,7 @@ local function scene1(scene, root)
 
   -- wait until mars is to the right of earth (same y position)
   scene:wait(
-    scene:time_until(earth.pos.y, mars.pos.y, nil, 2)
+    scene:time_until(earth.pos.y, mars.pos.y, 1, 3)
       - 1
   )
 
@@ -114,7 +115,7 @@ local function scene1(scene, root)
     )
   )
 
-  scene:advance(vert, function(last, delta) return last + delta * 8 end)
+  scene:advance(vert, 8)
 end
 
 return shapes.start(scene1, true)

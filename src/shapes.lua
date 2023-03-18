@@ -319,7 +319,7 @@ end
 
 ---@class Trace : Shape
 ---@field width    signal<number>
----@field accuracy signal<number>
+---@field accuracy number
 ---
 ---@field package list vec2[]
 shapes.Trace = shapes.newshape()
@@ -328,7 +328,7 @@ shapes.Trace = shapes.newshape()
 function shapes.Trace:update()
   local last = self.list[#self.list]
   local this = self.pos()
-  if last:distanceSq(this) >= self.accuracy() * self.accuracy() then
+  if last:distanceSq(this) >= self.accuracy * self.accuracy then
     table.insert(self.list, this)
   end
 end
@@ -360,17 +360,17 @@ end
 
 ---@param pos?      signalValue<vec2, Trace>
 ---@param width?    signalValue<number, Trace>
----@param accuracy? signalValue<number, Trace>
+---@param accuracy? number
 ---@return Trace
 ---@nodiscard
 function shapes.Trace.new(pos, width, accuracy)
 
   local value = {
     width = width or 1,
-    accuracy = accuracy or 1,
   }
 
   local trace = shapes.Shape(pos, value, shapes.Trace)
+  trace.accuracy = accuracy or 1
   trace:reset()
   return trace
 end

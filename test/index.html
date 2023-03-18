@@ -87,7 +87,7 @@
             thread.lua.lua_settop(thread.address, -2)
 
             let lastx, lasty
-            let lines = [new DOMMatrix([1, 0, 0, 1, 0, 0])]
+            let lines = []
             let fillTrans
 
             const switchLine = () => {
@@ -99,13 +99,12 @@
                 ctx.setTransform(ctx.getTransform().inverse())
                 ctx.transform(last.a, last.b, last.c, last.d, last.e, last.f)
                 fillTrans = ctx.getTransform().inverse()
-                ctx.restore()
 
                 ctx.setTransform(last)
             }
             const switchFill = () => {
                 if (!fillTrans) return
-                ctx.setTransform(fillTrans)
+                ctx.restore()
                 fillTrans = undefined
             }
 
@@ -129,25 +128,17 @@
                         case 0: // OBJECT
                             switchFill()
                             ctx.save()
-                            const a = num(3)
-                            const b = num(4)
-                            const c = num(5)
-                            const d = num(6)
-                            const e = num(7)
-                            const f = num(8)
-                            ctx.transform(a, b, c, d, e, f)
+                            ctx.transform(num(3), num(4), num(5), num(6), num(7), num(8))
 
-                            const last = lines[lines.length - 1]
                             if (num(2) == 1) { // transform lines
                                 lines.push(ctx.getTransform())
                             } else {
-                                lines.push(last)
+                                lines.push(lines[lines.length - 1])
                             }
                             break
                         case 1: // END
-                            lines.pop()
+                            switchFill()
                             ctx.restore()
-                            fillTrans = undefined
                             break
                         case 3: // LINE WIDTH
                             ctx.lineWidth = num(1)
@@ -245,6 +236,7 @@
                         ctx.strokeStyle = "white"
                         ctx.translate(canvas.width / 2, canvas.height / 2)
                         ctx.scale(canvas.width / 2 / 256, canvas.width / 2 / 256)
+                        lines.push(ctx.getTransform())
 
                         thread.lua.lua_pushvalue(thread.address, -1)
                         thread.lua.lua_pushnumber(thread.address, frame)
