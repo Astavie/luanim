@@ -50,8 +50,6 @@
                 console.log(`[${diff}] ${text}\n`)
             }
 
-            let lastx, lasty
-
             const factory = new LuaFactory("./wasmoon/glue.wasm")
             await factory.mountFile("ir.lua", await (await fetch("./lua/ir.lua")).text())
             await factory.mountFile("signal.lua", await (await fetch("./lua/signal.lua")).text())
@@ -88,8 +86,20 @@
             thread.lua.luaL_requiref(thread.address, "canvas", fpCanvas, 0)
             thread.lua.lua_settop(thread.address, -2)
 
-            let line_trans = [1, 0, 0, 1, 0, 0];
-            let fill_trans;
+            let lastx, lasty
+            let lineTrans = new DOMMatrix([1, 0, 0, 1, 0, 0])
+            let fillTrans
+
+            const switchLine = () => {
+                if (fillTrans) return
+                fillTrans = ctx.getTransform()
+                ctx.setTransform(lineTrans)
+            }
+            const switchFill = () => {
+                if (!fillTrans) return
+                ctx.setTransform(fillTrans)
+                fillTrans = undefined
+            }
 
             const draw = (buffer, size) => {
                 let index = 0
@@ -109,24 +119,24 @@
 
                     switch (num(0)) {
                         case 0: // OBJECT
+                            switchFill()
                             ctx.save()
                             ctx.transform(num(3), num(4), num(5), num(6), num(7), num(8))
                             break
                         case 1: // END
                             ctx.restore()
+                            fillTrans = undefined
                             break
                         case 3: // LINE WIDTH
                             ctx.lineWidth = num(1)
                             break
                         case 7: // PATH START
                             {
-                            fill_trans = ctx.getTransform()
-                            const m = fill_trans
+                            switchLine()
+                            const m = fillTrans
                             const x = num(1)
                             const y = num(2)
 
-                            ctx.save()
-                            ctx.setTransform(...line_trans)
                             ctx.beginPath()
                             lastx = m.a * x + m.c * y + m.e
                             lasty = m.b * x + m.d * y + m.f
@@ -135,7 +145,7 @@
                             break
                         case 9: // LINE
                             {
-                            const m = fill_trans
+                            const m = fillTrans
                             const x = num(1)
                             const y = num(2)
                             ctx.lineTo(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f)
@@ -146,14 +156,15 @@
                             break
                         case 20: // END PATH
                             ctx.stroke()
-                            ctx.restore()
                             break
                         case 11: // RECTANGLE
+                            switchFill()
                             ctx.beginPath()
                             ctx.rect(num(1), num(2), num(3), num(4))
                             ctx.fill()
                             break
                         case 13: // TEXT
+                            switchFill()
                             ctx.save()
                             ctx.scale(num(3), num(3))
                             ctx.fillText(str(4), num(1), num(2))
@@ -161,19 +172,18 @@
                             break
                         case 4: // POINT
                             {
-                            const m = ctx.getTransform()
+                            switchLine()
+                            const m = fillTrans
                             const x = num(1)
                             const y = num(2)
 
-                            ctx.save()
-                            ctx.setTransform(...line_trans)
                             ctx.beginPath()
                             ctx.arc(m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f, num(3), 0, 2 * Math.PI)
                             ctx.fill()
-                            ctx.restore()
                             }
                             break
                         case 19: // CIRCLE
+                            switchFill()
                             ctx.beginPath()
                             ctx.arc(num(1), num(2), num(3), 0, 2 * Math.PI)
                             ctx.fill()

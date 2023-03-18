@@ -225,7 +225,6 @@ function luanim.advance_frame(scene, fps, prev_frame)
       -- calculate animation at end
       if instr.anim ~= nil then
         signal.lock(instr.anim, 1)
-        instr.anim(1)
       end
 
       -- resume coroutine
@@ -250,7 +249,6 @@ function luanim.advance_frame(scene, fps, prev_frame)
       if instr.easing ~= nil then p = instr.easing(p) end
 
       signal.lock(instr.anim, p)
-      instr.anim(p)
     end
 
     ::loop_end::
