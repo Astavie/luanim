@@ -136,19 +136,19 @@ function shapes.Shape.new(pos, value, metatable)
     children = {},
   }
 
-  shape.pos   = luanim.signal(pos or vec2(0, 0), nil, shape)
-  shape.angle = luanim.signal(0, nil, shape)
-  shape.scale = luanim.signal(vec2(1, 1), nil, shape)
+  shape.pos   = luanim.signal(pos or vec2(0, 0), nil, shape, vec2)
+  shape.angle = luanim.signal(0, nil, shape, vec2)
+  shape.scale = luanim.signal(vec2(1, 1), nil, shape, vec2)
 
-  shape.transform = luanim.computed(transform, shape)
-  shape.inverse   = luanim.computed(inverse, shape)
+  shape.transform = luanim.computed(transform, shape, mat3)
+  shape.inverse   = luanim.computed(inverse, shape, mat3)
 
-  shape.root_transform = luanim.computed(root_transform, shape)
-  shape.root_inverse   = luanim.computed(root_inverse, shape)
-  shape.root_pos       = luanim.computed(root_pos, shape)
+  shape.root_transform = luanim.computed(root_transform, shape, mat3)
+  shape.root_inverse   = luanim.computed(root_inverse, shape, mat3)
+  shape.root_pos       = luanim.computed(root_pos, shape, vec2)
 
   for k, v in pairs(value or {}) do
-    shape[k] = luanim.signal(v, nil, shape)
+    shape[k] = luanim.signal(v, nil, shape, vec2)
   end
 
   setmetatable(shape, metatable)
@@ -162,10 +162,18 @@ function shapes.Shape:vector_to(shape)
   return self.root_inverse() * shape.root_pos()
 end
 
+---@param self Shape
+---@param shape Shape
+---@return fun(): vec2
+function shapes.Shape:computed_vector_to(shape)
+  return self.root_inverse * shape.root_pos
+end
+
 setmetatable(shapes.Shape, { __call = function(self, ...) return self.new(...) end })
 
 ---@param self Shape
 ---@param child Shape
+---@return Shape
 function shapes.Shape:add_child(child)
   if child.parent ~= nil then
 	  child.parent:remove(child)
@@ -173,6 +181,7 @@ function shapes.Shape:add_child(child)
 
   child.parent = self
   self.children[child.id] = child
+  return self
 end
 
 ---@param self Shape
@@ -209,7 +218,7 @@ function shapes.Circle:draw(emit)
   emit(ir.CIRCLE, 0, 0, self.radius())
 end
 
----@param pos    signalValue<vec2,   Circle>
+---@param pos?   signalValue<vec2,   Circle>
 ---@param radius signalValue<number, Circle>
 ---@return Circle
 ---@nodiscard
@@ -346,7 +355,7 @@ function shapes.Trace:draw(emit)
   emit(ir.PATH_END)
 end
 
----@param pos       signalValue<vec2, Trace>
+---@param pos?      signalValue<vec2, Trace>
 ---@param width?    signalValue<number, Trace>
 ---@param accuracy? signalValue<number, Trace>
 ---@return Trace
@@ -379,15 +388,15 @@ function shapes.Line:draw(emit)
   emit(ir.PATH_END)
 end
 
----@param v1     signalValue<vec2,   Line>
----@param v2     signalValue<vec2,   Line>
+---@param v1?    signalValue<vec2,   Line>
+---@param v2?    signalValue<vec2,   Line>
 ---@param width? signalValue<number, Line>
 ---@return Line
 ---@nodiscard
 function shapes.Line.new(v1, v2, width)
 
   local value = {
-    vec = v2,
+    vec = v2 or vec2(0),
     width = width or 1,
   }
 
@@ -406,12 +415,12 @@ function shapes.Rect:draw(emit)
   emit(ir.RECT, 0, 0, self.size():unpack())
 end
 
----@param pos  signalValue<vec2, Rect>
----@param size signalValue<vec2, Rect>
+---@param pos?  signalValue<vec2, Rect>
+---@param size? signalValue<vec2, Rect>
 ---@return Rect
 ---@nodiscard
 function shapes.Rect.new(pos, size)
-  return shapes.Shape(pos, { size = size }, shapes.Rect)
+  return shapes.Shape(pos, { size = size or vec2(0) }, shapes.Rect)
 end
 
 --- POINTER ---
@@ -449,7 +458,13 @@ end
 ---@class Text
 ---@field text signal<string>
 ---@field size signal<number>
+---@field width fun(): number
 shapes.Text = shapes.newshape()
+
+---@param self Text
+function shapes.Text:center()
+  return -self.width() / 2
+end
 
 ---@param self Text
 ---@param emit fun(...)

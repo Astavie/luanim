@@ -7,20 +7,16 @@ local function planet(size, name, time, r)
   local period = rt * rt * rt
   if period == 0 then period = 1 end
 
-  local year = luanim.computed(function()
-    return time() / period
-  end)
-
   local p = shapes.Circle(
-    function()
-      local x = 50 * r * math.cos(year() * 2 * math.pi)
-      local y = 50 * r * math.sin(year() * 2 * math.pi)
+    function(self)
+      local x = 50 * r * math.cos(self.year() * 2 * math.pi)
+      local y = 50 * r * math.sin(self.year() * 2 * math.pi)
       return vec2(x, y)
     end,
     size
   )
 
-  p.year = year
+  p.year = time / period
   p:add_child(shapes.Text(vec2(size + 2, 1), name, 0.5))
   return p
 end
@@ -33,10 +29,7 @@ local function scene1(scene, root)
 
   -- camera focus point
   local focus = luanim.signal(vec2(0))
-  local camera = shapes.Shape(function()
-    -- pos
-    return -focus()
-  end)
+  local camera = shapes.Shape(-focus)
 
   -- add children
   camera:add_child(earth)
@@ -47,15 +40,10 @@ local function scene1(scene, root)
   -- focus text
   local focused = luanim.signal("Sun")
 
-  root:add_child(shapes.Text(
-    function(text)
-      -- center text
-      return vec2(-text.width() / 2, -130)
-    end,
-    function()
-      return "Focus: " .. focused()
-    end
-  ))
+  root:add_child(shapes.Text({
+    x = shapes.Text.center,
+    y = -130
+  }, "Focus: " .. focused ))
 
   -- start advancing time
   scene:advance(time, function(last, delta) return last + delta / 3 end)
@@ -85,14 +73,18 @@ local function scene1(scene, root)
   )
 
   -- add line to mars
-  local line = shapes.Line(vec2(0), vec2(0))
+  local line = shapes.Line()
   root:add_child(line)
-  line.vec(function() return earth:vector_to(mars) end, 1)
+  line.vec(earth:computed_vector_to(mars), 1)
 
   -- put line to the side
   line:add_child(shapes.Circle(line.vec, 1.5))
 
-  line.vec(function() return vec2(vec2.distance(earth.pos(), mars.pos()), 0) end)
+  line.vec({
+    x = (earth.pos - mars.pos):length(),
+    y = 0
+  })
+
   line.pos(vec2(120, -120), 0.5)
 
   -- trace mars again
@@ -103,21 +95,24 @@ local function scene1(scene, root)
   -- add distance text
   line:add_child(shapes.Text(
     vec2(2, -2),
-    function()
-      return line.vec():length() / 50 .. " au"
-    end,
+    line.vec:length() / 50 .. " au",
     0.5
   ))
 
   -- graph
   local vert = luanim.signal(0)
-  local handle = shapes.Shape(function()
-    return vec2(0, vert())
-  end)
-  handle:add_child(shapes.Trace(function()
-    return vec2(line.vec().x, -vert())
-  end))
-  line:add_child(handle)
+
+  line:add_child(
+    shapes.Shape({
+      x = 0,
+      y = vert
+    }):add_child(
+      shapes.Trace({
+        x = line.vec.x,
+        y = -vert
+      })
+    )
+  )
 
   scene:advance(vert, function(last, delta) return last + delta * 8 end)
 end
