@@ -22,6 +22,7 @@ local global_id = 0
 ---@field pos   signal<vec2,   Shape>
 ---@field angle signal<number, Shape>
 ---@field scale signal<vec2,   Shape>
+---@field scale_lines boolean
 ---
 ---@field transform fun(): mat3
 ---@field inverse   fun(): mat3
@@ -48,7 +49,7 @@ function shapes.Shape:draw_shape(emit)
   emit(
     ir.OBJECT,
     tostring(self.id),        -- uid
-    false,                    -- scale line width
+    self.scale_lines,         -- scale line width
     self.transform():unpack() -- transform
   )
 
@@ -134,6 +135,7 @@ function shapes.Shape.new(pos, value, metatable)
 
   local shape = {
     id = shapes.next_id(),
+    scale_lines = false,
     children = {},
   }
 

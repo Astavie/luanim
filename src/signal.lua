@@ -1,7 +1,6 @@
 local tweens = require 'tweens'
 
 local signal_parent
-local signal_readonly = false
 
 local signal = {}
 
@@ -10,14 +9,6 @@ setmetatable(signal, {
     return self.signal(...)
   end
 })
-
-function signal.lock(f, ...)
-  local prev = signal_readonly
-  signal_readonly = true
-  local res = {f(...)}
-  signal_readonly = prev
-  return table.unpack(res)
-end
 
 ---@alias interp<T>         fun(a: T, b: T, p: number): T
 ---@alias signalValue<T, C> T | fun(ctx: C): T
@@ -177,17 +168,17 @@ function signal.signal(value, definterp, context, default_mtbl)
       method = mtbl:__index(key)
     end
     if type(method) == 'function' then
-      return sg.bind_function(method)
+      return signal.bind_function(method)
     end
 
     -- GET INNER VALUE --
-    return sg.computed(function()
+    return signal.computed(function()
       return out()[key]
     end)
   end
   function metatable:__call(newval, time, easing, interp)
     -- GET VALUE --
-    if newval == nil or signal_readonly then
+    if newval == nil or signal_parent ~= nil then
       if signal_parent ~= nil then
         -- update dependencies
         signal_parent.dependencies[sg] = sg
@@ -203,12 +194,8 @@ function signal.signal(value, definterp, context, default_mtbl)
         sg.dependencies = {}
 
         local oldparent   = signal_parent
-        local oldreadonly = signal_readonly
-
         signal_parent = sg
-        signal_readonly = true
         sg.cache = sg.value(context)
-        signal_readonly = oldreadonly
         signal_parent = oldparent
       end
 
@@ -234,14 +221,14 @@ function signal.signal(value, definterp, context, default_mtbl)
       return
     end
 
-    -- remove dependencies
-    for k, _ in pairs(sg.dependencies) do
-      k.dependents[sg] = nil
-    end
-    sg.dependencies = {}
-
     time = time or 0
     if time == 0 then
+      -- remove dependencies
+      for k, _ in pairs(sg.dependencies) do
+        k.dependents[sg] = nil
+      end
+      sg.dependencies = {}
+
       -- static value
       if signal.is_callable(newval) then
         sg.value = newval
@@ -259,10 +246,7 @@ function signal.signal(value, definterp, context, default_mtbl)
     local new = signal.as_callable(newval)
 
     coroutine.yield({ duration = time, easing = easing, anim = function (p)
-      local v = interp(old(context), new(context), p)
-      sg.value = function() return v end
-      sg.cache = v
-      invalidate(sg)
+      out(function() return interp(old(context), new(context), p) end)
     end })
 
     -- set value

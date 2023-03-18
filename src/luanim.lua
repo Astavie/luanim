@@ -86,14 +86,8 @@ end
 ---
 ---@return number
 function luanim.Scene:time_until(a, b, x0, x1, eps, max)
-  if not luanim.is_callable(a) then
-    local val = a
-    a = function() return val end
-  end
-  if not luanim.is_callable(b) then
-    local val = b
-    b = function() return val end
-  end
+  a = signal.as_callable(a)
+  b = signal.as_callable(b)
 
   eps = eps or 0.01
   max = max or 20
@@ -224,7 +218,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
 
       -- calculate animation at end
       if instr.anim ~= nil then
-        signal.lock(instr.anim, 1)
+        instr.anim(1)
       end
 
       -- resume coroutine
@@ -247,8 +241,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
     if instr.anim ~= nil then
       local p = (scene.time() - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
-
-      signal.lock(instr.anim, p)
+      instr.anim(p)
     end
 
     ::loop_end::

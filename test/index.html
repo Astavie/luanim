@@ -87,13 +87,21 @@
             thread.lua.lua_settop(thread.address, -2)
 
             let lastx, lasty
-            let lineTrans = new DOMMatrix([1, 0, 0, 1, 0, 0])
+            let lines = [new DOMMatrix([1, 0, 0, 1, 0, 0])]
             let fillTrans
 
             const switchLine = () => {
                 if (fillTrans) return
-                fillTrans = ctx.getTransform()
-                ctx.setTransform(lineTrans)
+
+                const last = lines[lines.length - 1]
+
+                ctx.save()
+                ctx.setTransform(ctx.getTransform().inverse())
+                ctx.transform(last.a, last.b, last.c, last.d, last.e, last.f)
+                fillTrans = ctx.getTransform().inverse()
+                ctx.restore()
+
+                ctx.setTransform(last)
             }
             const switchFill = () => {
                 if (!fillTrans) return
@@ -121,9 +129,23 @@
                         case 0: // OBJECT
                             switchFill()
                             ctx.save()
-                            ctx.transform(num(3), num(4), num(5), num(6), num(7), num(8))
+                            const a = num(3)
+                            const b = num(4)
+                            const c = num(5)
+                            const d = num(6)
+                            const e = num(7)
+                            const f = num(8)
+                            ctx.transform(a, b, c, d, e, f)
+
+                            const last = lines[lines.length - 1]
+                            if (num(2) == 1) { // transform lines
+                                lines.push(ctx.getTransform())
+                            } else {
+                                lines.push(last)
+                            }
                             break
                         case 1: // END
+                            lines.pop()
                             ctx.restore()
                             fillTrans = undefined
                             break

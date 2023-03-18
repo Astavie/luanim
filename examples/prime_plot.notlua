@@ -7678,23 +7678,27 @@ local function plot_num(n)
 end
 
 local function plot(scene, root)
-  local cloud = shapes.PointCloud(plot_num, 1, 5000, 2)
-  cloud.scale(vec2(100))
+  local cloud = shapes.PointCloud(plot_num, 1, 5000, 4)
 
+  local scale = 16
+  cloud.scale(vec2(1 / scale))
+
+  root.scale(vec2(100 * scale))
+  --root.scale_lines = true
   root:add_child(cloud)
 
   -- zoom out
-  cloud.scale(vec2(0.012), 5, nil, tweens.interp.log)
+  root.scale(vec2(0.012 * scale), 5, nil, tweens.interp.log)
 
   -- make points smaller
-  cloud.radius(0.5, 1)
+  cloud.radius(1, 1)
 
   -- remove first 2500 primes
   cloud.min(2500, 2)
 
   -- zoom out even more
   cloud.max(25000)
-  cloud.scale(vec2(0.0012), 2, nil, tweens.interp.log)
+  root.scale(vec2(0.0012 * scale), 2, nil, tweens.interp.log)
 end
 
 return shapes.start(plot)
