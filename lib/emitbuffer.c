@@ -33,6 +33,10 @@ static int luanim_emit(lua_State* L) {
         buffer[buffer_size].s = strdup(lua_tostring(L, i));
         break;
       }
+      case LUA_TBOOLEAN: {
+        buffer[buffer_size].d = (double) lua_toboolean(L, i);
+        break;
+      }
     }
     buffer_size++;
   }

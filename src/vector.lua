@@ -147,6 +147,12 @@ function vector.vec2.new(x, y)
   return vec
 end
 
+---@param self vec2
+---@return number, number
+function vector.vec2:unpack()
+  return self.x, self.y
+end
+
 setmetatable(vector.vec2, { __call = function(self, ...) return self.new(...) end })
 
 return vector

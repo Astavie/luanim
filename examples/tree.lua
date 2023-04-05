@@ -48,4 +48,4 @@ local function tree_anim(scene, root)
   text.size(0, 1)
 end
 
-return shapes.loop(tree_anim)
+return shapes.start(tree_anim)

@@ -3,6 +3,12 @@ local tweens = {}
 tweens.easing = {}
 tweens.interp = {}
 
+debug.setmetatable(0, {
+  __index = function(_, key)
+    return math[key]
+  end
+})
+
 ---
 ---No easing
 ---
@@ -38,11 +44,7 @@ end
 ---@return T
 function tweens.interp.integer(a, b, p)
   local linear = tweens.interp.linear(a, b, p)
-  if type(linear) == 'number' then
-    return math.floor(linear)
-  else
-    return linear:floor()
-  end
+  return linear:floor()
 end
 
 ---
@@ -55,17 +57,10 @@ end
 ---@param p number
 ---@return T
 function tweens.interp.log(a, b, p)
-  if type(a) == 'number' then
-    local loga = math.log(a)
-    local logb = math.log(b)
-    local interp = tweens.interp.linear(loga, logb, p)
-    return math.exp(interp)
-  else
-    local loga = a:log()
-    local logb = b:log()
-    local interp = tweens.interp.linear(loga, logb, p)
-    return interp:exp()
-  end
+  local loga = a:log()
+  local logb = b:log()
+  local interp = tweens.interp.linear(loga, logb, p)
+  return interp:exp()
 end
 
 ---
@@ -80,11 +75,7 @@ end
 ---@return T
 function tweens.interp.log_integer(a, b, p)
   local result = tweens.interp.log(a, b, p)
-  if type(result) == 'number' then
-    return math.floor(result)
-  else
-    return result:floor()
-  end
+  return result:floor()
 end
 
 return tweens

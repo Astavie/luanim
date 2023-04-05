@@ -1,125 +1,169 @@
-local luanim = require 'luanim'
+local signal = require 'signal'
 local shapes = require 'shapes'
 local vec2   = require 'vector'.vec2
-local ir     = require 'ir'
 
-local function measure(s)
-  return coroutine.yield(ir.MEASURE, s)
-end
-
-local function planet(size, name, time, r)
+local function planet(size, name, time, r, offset)
+  offset = offset or 0
   local rt = math.sqrt(r)
   local period = rt * rt * rt
   if period == 0 then period = 1 end
 
-  local year = luanim.computed(function()
-    return time() / period
-  end)
+  local p = shapes.Circle({
+    x = 50 * r * (signal.me.year * 2 * math.pi):cos(),
+    y = 50 * r * (signal.me.year * 2 * math.pi):sin()
+  }, size)
 
-  local p = shapes.Circle(
-    function()
-      local x = 50 * r * math.cos(year() * 2 * math.pi)
-      local y = 50 * r * math.sin(year() * 2 * math.pi)
-      return vec2(x, y)
-    end,
-    size
-  )
-
-  p.year = year
-  p:add_child(shapes.Text(vec2(size + 2, 1), name, 0.5))
+  p.year = time / period - offset
+  p.orbital_radius = r
+  p:add_child(shapes.Text({ x = function(text) return -text.width() - size - 1 end, y = 1.33 }, name, 0.5))
   return p
+end
+
+local function stars(size, count, radius)
+  local function star(n)
+    math.randomseed(n)
+    return (math.random() - 0.5) * size.x, (math.random() - 0.5) * size.y
+  end
+  return shapes.PointCloud(star, 1, count, radius)
 end
 
 local function scene1(scene, root)
   -- basic shapes
-  local time = luanim.signal(0)
+  local time = signal(0)
   local earth = planet(3, "Earth", time, 1)
-  local mars = planet(1.5, "Mars", time, 1.52368055)
+  local mars = planet(1.5, "Mars", time, 1.52368055, 0.1)
 
   -- camera focus point
-  local focus = luanim.signal(vec2(0))
-  local camera = shapes.Shape(function()
-    -- pos
-    return -focus()
-  end)
+  local focus = signal(vec2(0))
+  local camang = shapes.Shape()
+  local camera = shapes.Shape(-focus)
+
+  local cloud = stars(vec2(512), 1000, 0.2)
+  cloud.pos(focus)
+  camera:add_child(cloud)
 
   -- add children
   camera:add_child(earth)
   camera:add_child(mars)
   camera:add_child(planet(6, "Sun", time, 0))
-  root:add_child(camera)
+  camang:add_child(camera)
+  root:add_child(camang)
 
   -- focus text
-  local focused = luanim.signal("Sun")
+  local focused = signal("Sun")
 
-  root:add_child(shapes.Text(
-    function(text)
-      -- center text
-      return vec2(-measure(text.text()) / 2, -130)
-    end,
-    function()
-      return "Focus: " .. focused()
-    end
-  ))
+  root:add_child(shapes.Text({
+    x = -signal.me.width / 2,
+    y = -130
+  }, "Focus: " .. focused ))
 
   -- start advancing time
-  scene:advance(time, function(last, delta) return last + delta / 3 end)
+  scene:advance(time, 1 / 3)
   scene:wait(2)
 
   -- trace to follow mars
-  local trace = shapes.Trace(mars.rootPos)
+  local trace = shapes.Trace(mars.root_pos)
   root:add_child(trace)
 
   -- wait for a full mars orbit (wait until mars is one year further)
-  local start = mars.year()
-  scene:waitUntil(mars.year, start + 1)
+  scene:wait(
+    scene:time_until(mars.year, mars.year() + 1)
+      - 0.5
+  )
 
   -- remove trace
-  scene:wait(0.5)
-  trace.width(0, 0.1)
+  trace.width(0, 0.5)
   root:remove(trace)
 
+  -- wait for a full earth orbit (wait until earth is to the right)
+  scene:wait(
+    scene:time_until(earth.year, math.ceil(earth.year()))
+      - 1
+  )
+
   -- change focus to earth
+  focus(vec2(50, 0), 1)
+  focus(earth.pos)
   focused("Earth")
-  focus(earth.pos, 1)
-  scene:wait(1)
+
+  -- wait until mars is to the right of earth (same y position)
+  scene:wait(
+    scene:time_until(earth.pos.y, mars.pos.y, 2, 5)
+      - 1
+  )
 
   -- add line to mars
-  local line = shapes.Line(vec2(0), vec2(0))
+  local line = shapes.Line()
   root:add_child(line)
-  line.vec(function() return earth:vectorTo(mars) end, 1)
+
+  local aumeter = shapes.Text(
+    vec2(2, -2),
+    line.vec:length() / 50 .. " au",
+    0
+  )
+  scene:advance(aumeter.size, 0.5)
+  line:add_child(aumeter)
+
+  line.vec({
+    x = (earth.pos - mars.pos):length(),
+    y = 0
+  }, 1)
+  aumeter.size(aumeter.size())
+
+  -- graph
+  local vert = signal(0)
+  scene:advance(vert, 8)
+
+  local graph = shapes.Trace({
+    x = line.vec.x,
+    y = -vert
+  })
+  local handle = shapes.Shape({
+    x = 0,
+    y = vert
+  }):add_child(graph)
+
+  line:add_child(handle)
 
   -- put line to the side
   line:add_child(shapes.Circle(line.vec, 1.5))
-
-  scene:parallel(function() line.pos(vec2(120, -120), 1) end)
-  line.vec(function() return vec2(vec2.distance(earth.pos(), mars.pos()), 0) end, 1)
+  line.pos(vec2(120, -120), 0.5)
 
   -- trace mars again
   trace:reset()
   trace.width(1)
   root:add_child(trace)
+  scene:wait(7)
 
-  -- add distance text
-  line:add_child(shapes.Text(
-    vec2(2, -2),
-    function()
-      return line.vec():length() / 50 .. " au"
-    end,
-    0.5
-  ))
+  -- wait for a full earth orbit (wait until earth is to the right)
+  scene:wait(
+    scene:time_until(earth.year, math.ceil(earth.year()))
+      - 1
+  )
 
-  -- graph
-  local vert = luanim.signal(0)
-  local handle = shapes.Shape(function()
-    return vec2(0, vert())
-  end)
-  handle:add_child(shapes.Trace(function()
-    return vec2(line.vec().x, -vert())
-  end))
-  line:add_child(handle)
+  local width = signal(1)
+  root:add_child(shapes.Line({ x = -50 * earth.orbital_radius, y = width * 256 }, vec2(0, 256)))
 
-  scene:advance(vert, function(last, delta) return last + delta * 8 end)
+  graph.width(width)
+  trace.width(width)
+  width(0, 1)
+  handle:remove(graph)
+  root:remove(trace)
+
+  -- focus
+  focus(earth.pos)
+  focused("Earth-Sun")
+  camang.angle(-earth.year * 2 * math.pi)
+  scene:wait(1)
+
+  -- trace mars again
+  graph:reset()
+  graph.width(1)
+  handle:add_child(graph)
+
+  trace:reset()
+  trace.width(1)
+  root:add_child(trace)
 end
 
 return shapes.start(scene1, true)

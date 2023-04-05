@@ -1,5 +1,5 @@
 local ir = require 'ir'
-local tweens = require 'tweens'
+local signal = require 'signal'
 
 local luanim = {}
 
@@ -10,6 +10,7 @@ local luanim = {}
 ---@field easing?   easing
 
 ---@class Scene
+---@field clock fun(): seconds
 ---@field package time      signal<seconds, nil>
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
@@ -25,12 +26,6 @@ function luanim.Scene:wait(time)
 end
 
 ---@param self Scene
----@return seconds
-function luanim.Scene:clock()
-  return self.time()
-end
-
----@param self Scene
 ---@param anim animation
 ---@param time? seconds
 ---@param easing? easing
@@ -41,14 +36,21 @@ end
 
 ---@generic T
 ---@generic C
----@param signal signal<T, C>
----@param func fun(prev: T, delta: number, ctx: C): T
-function luanim.Scene:advance(signal, func)
+---@param sg signal<T, C>
+---@param func T | fun(prev: T, delta: number, ctx: C): T
+function luanim.Scene:advance(sg, func)
 
-  local prev = signal()
+  if type(func) ~= 'function' then
+    local speed = func
+    func = function(last, delta)
+      return last + delta * speed
+    end
+  end
+
+  local prev = sg()
   local time = self:clock()
 
-  signal(function(ctx)
+  sg(function(ctx)
     local delta = self:clock() - time
     prev = func(prev, delta, ctx)
     time = self:clock()
@@ -63,7 +65,7 @@ end
 ---@return id
 function luanim.Scene:interval(time, func, ...)
   local args = {...}
-  return self:parallel(function() 
+  return self:parallel(function()
     while true do
       self:parallel(func, table.unpack(args))
       self:wait(time)
@@ -83,15 +85,11 @@ end
 ---
 ---@param eps? number
 ---@param max? integer
-function luanim.Scene:waitUntil(a, b, x0, x1, eps, max)
-  if type(a) ~= 'function' then
-    local val = a
-    a = function() return val end
-  end
-  if type(b) ~= 'function' then
-    local val = b
-    b = function() return val end
-  end
+---
+---@return number
+function luanim.Scene:time_until(a, b, x0, x1, eps, max)
+  a = signal.as_callable(a)
+  b = signal.as_callable(b)
 
   eps = eps or 0.01
   max = max or 20
@@ -137,7 +135,8 @@ function luanim.Scene:waitUntil(a, b, x0, x1, eps, max)
 
   -- reset time
   self.time(start)
-  self:wait(x0 - start)
+
+  return x0 - start
 end
 
 ---@alias id integer
@@ -148,6 +147,10 @@ function luanim.Scene:terminate(id)
   table.insert(self.to_remove, id)
 end
 
+function luanim.Scene.onerr(...)
+  print(debug.traceback(...))
+end
+
 ---@param self Scene
 ---@param func fun(scene: Scene, ...: any)
 ---@param ... any
@@ -156,21 +159,15 @@ function luanim.Scene:parallel(func, ...)
   local id = self.nextid
   self.nextid = self.nextid + 1
 
-  self.threads[id] = coroutine.create(func);
+  self.threads[id] = coroutine.create(function(...)
+    return xpcall(func, self.onerr, ...)
+  end);
 
   local ret = {coroutine.resume(self.threads[id], self, ...)}
   local alive = ret[1]
   local instr = ret[2]
 
-  while alive and type(instr) == 'number' do
-      -- if we yielded an instruction, yield it back up the call stack
-      local resume = {coroutine.yield(select(2, table.unpack(ret)))}
-      ret = {coroutine.resume(self.threads[id], table.unpack(resume))}
-      alive = ret[1]
-      instr = ret[2]
-  end
-
-  if alive and instr ~= nil then
+  if alive and type(instr) == 'table' then
     instr.start = self.time()
     self.queued[id] = instr
   else
@@ -185,13 +182,14 @@ end
 function luanim.Scene.new()
   ---@type Scene
   local scene = {
-    time = luanim.signal(0),
+    time = signal.signal(0),
     refs = {},
     threads = {},
     queued = {},
     to_remove = {},
     nextid = 0,
   }
+  scene.clock = signal.bind(scene.time)
 
   setmetatable(scene, luanim.Scene)
   return scene
@@ -237,15 +235,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
       local alive = ret[1]
       instr = ret[2]
 
-      while alive and type(instr) == 'number' do
-        -- if we yielded an instruction, yield it back up the call stack
-        local resume = {coroutine.yield(select(2, table.unpack(ret)))}
-        ret = {coroutine.resume(scene.threads[id], table.unpack(resume))}
-        alive = ret[1]
-        instr = ret[2]
-      end
-
-      if alive and instr ~= nil then
+      if alive and type(instr) == 'table' then
         instr.start = scene.time()
         scene.queued[id] = instr
       else
@@ -281,140 +271,18 @@ function luanim.advance_frame(scene, fps, prev_frame)
   return hasNext
 end
 
-local parentSignal
 
----@alias interp<T>         fun(a: T, b: T, p: number): T
----@alias signalValue<T, C> T | fun(ctx: C): T
----@alias signal<T, C>      fun(value?: signalValue<T, C>, time?: number, easing?: easing, interp?: interp<T>): T
-
-local function invalidate(signal)
-  for k, _ in pairs(signal.dependents) do
-    k.cache = nil
-    invalidate(k)
-  end
-end
-
----@generic T
----@generic C
----@param value signalValue<T, C>
----@param context? C
----@return fun(): T
-function luanim.computed(value, context)
-  local signal = luanim.signal(value, nil, context)
-  return function() return signal() end
-end
-
----@generic T
----@generic C
----@param value signalValue<T, C>
----@param definterp? interp<T>
----@param context? C
----@return signal<T, C>
-function luanim.signal(value, definterp, context)
-  definterp = definterp or tweens.interp.linear
-
-  local signal = {
-    dependencies = {},
-    dependents = {},
-  }
-
-  if type(value) ~= 'function' then
-    signal.cache = value
-  end
-
-  return function(newval, time, easing, interp)
-    -- GET VALUE --
-    if newval == nil or parentSignal ~= nil then
-      if parentSignal ~= nil then
-        -- update dependencies
-        parentSignal.dependencies[signal] = signal
-        signal.dependents[parentSignal] = parentSignal
-      end
-
-      if signal.cache == nil then
-        -- value must be invalidated
-        -- remove dependencies
-        for k, _ in pairs(signal.dependencies) do
-          k.dependents[signal] = nil
-        end
-        signal.dependencies = {}
-
-        if type(value) == 'function' then
-          local parent = parentSignal
-          parentSignal = signal
-          signal.cache = value(context)
-          parentSignal = parent
-        else
-          signal.cache = value
-        end
-      end
-
-      return signal.cache
-    end
-
-    -- SET VALUE --
-    if newval == value then
-      return
-    end
-
-    -- remove dependencies
-    for k, _ in pairs(signal.dependencies) do
-      k.dependents[signal] = nil
-    end
-    signal.dependencies = {}
-
-    time = time or 0
-    if time == 0 then
-      -- static value
-      value = newval
-      if type(value) ~= 'function' then
-        signal.cache = value
-      else
-        signal.cache = nil
-      end
-      invalidate(signal)
-      return
-    end
-
-    interp = interp or definterp
-    local oldval = value
-    local old, new
-
-    -- if the old value is a function, clone it for the transition
-    if type(value) == 'function' then
-      old = luanim.signal(oldval, nil, context)
-    else
-      old = function() return oldval end
-    end
-
-    -- if the new value is a function, create a signal for it
-    if type(newval) == 'function' then
-      new = luanim.signal(newval, nil, context)
-    else
-      new = function() return newval end
-    end
-
-    coroutine.yield({ duration = time, easing = easing, anim = function (p)
-      value = interp(old(), new(), p)
-      signal.cache = value
-      invalidate(signal)
-    end })
-
-    -- set value
-    value = newval
-    if type(value) ~= 'function' then
-      signal.cache = value
-    else
-      signal.cache = nil
-    end
-    invalidate(signal)
-  end
-end
-
-function luanim.log(f, args)
+function luanim.log(f, magic, fps)
   local log = ""
   local function emit(...)
-    for i, x in ipairs({...}) do
+    local args = {...}
+
+    if args[1] == 108 then
+      log = log .. "MAGIC " .. args[7] .. "\n"
+      return
+    end
+
+    for i, x in ipairs(args) do
       if i == 1 then
         for k, v in pairs(ir) do
           if x == v then
@@ -423,26 +291,25 @@ function luanim.log(f, args)
           end
         end
       else
-        log = log .. " " .. x
+        log = log .. " " .. tostring(x)
       end
     end
     log = log .. "\n"
   end
 
-  args = args or {}
-  while true do
-    local ret = {f(table.unpack(args))}
-    if ret[1] == nil then return log end
+  emit(table.unpack(magic))
+  emit(ir.FPS, fps)
 
-    args = {}
-    if ret[1] == ir.MEASURE then
-      table.insert(args, string.len(ret[2])) -- every measurement will just be the length of the string
-    elseif ret[1] == ir.EMIT then
-      table.insert(args, emit)
-    else
-      emit(table.unpack(ret))
+  local frame = 0
+  while true do
+    emit(ir.FRAME, frame)
+    if f(frame, emit) then
+      break
     end
+    frame = frame + 1
   end
+
+  return log
 end
 
 return luanim
