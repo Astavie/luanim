@@ -1,6 +1,3 @@
-local tweens = require 'tweens'
-local vector = require 'vector'
-
 local signal_parent
 
 local signal = {}

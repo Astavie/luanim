@@ -62,6 +62,7 @@
             const thread = lua.global.newThread()
             const threadIndex = lua.global.getTop()
 
+            // canvas global
             const measure = (text, font) => {
                 return ctx.measureText(text).width
             }
@@ -70,21 +71,21 @@
                 return frames.value / speedo.value
             }
 
-            const fpCanvas = thread.lua.module.addFunction((address) => {
-                thread.lua.lua_createtable(address, 0, 0)
+            thread.lua.lua_createtable(thread.address, 0, 0)
 
-                thread.lua.lua_pushstring(address, "preferred_fps")
-                thread.pushValue(preferred_fps)
-                thread.lua.lua_settable(address, -3)
+            thread.lua.lua_pushstring(thread.address, "preferred_fps")
+            thread.pushValue(preferred_fps)
+            thread.lua.lua_settable(thread.address, -3)
 
-                thread.lua.lua_pushstring(address, "measure")
-                thread.pushValue(measure)
-                thread.lua.lua_settable(address, -3)
-                return 1
-            }, 'ii')
+            thread.lua.lua_pushstring(thread.address, "measure")
+            thread.pushValue(measure)
+            thread.lua.lua_settable(thread.address, -3)
 
-            thread.lua.luaL_requiref(thread.address, "canvas", fpCanvas, 0)
-            thread.lua.lua_settop(thread.address, -2)
+            thread.lua.lua_setglobal(thread.address, "canvas")
+
+            // other globals
+            thread.loadString(await (await fetch("./lua/init.lua")).text())
+            thread.assertOk(thread.lua.lua_pcallk(thread.address, 0, 1, 0, 0, null))
 
             let lastx, lasty
             let lines = []
@@ -263,7 +264,6 @@
             } finally {
                 thread.lua.module._luanim_draw()
                 thread.lua.module.removeFunction(fpDraw)
-                thread.lua.module.removeFunction(fpCanvas)
                 lua.global.close()
                 lua.global.remove(threadIndex)
             }

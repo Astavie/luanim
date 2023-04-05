@@ -1,6 +1,4 @@
-local signal = require 'signal'
-local shapes = require 'shapes'
-local vec2   = require 'vector'.vec2
+local vec2 = vector.vec2
 
 local function planet(size, name, time, r, offset)
   offset = offset or 0
@@ -15,7 +13,12 @@ local function planet(size, name, time, r, offset)
 
   p.year = time / period - offset
   p.orbital_radius = r
-  p:add_child(shapes.Text({ x = function(text) return -text.width() - size - 1 end, y = 1.33 }, name, 0.5))
+
+  p:add_child(shapes.Text({
+    x = -signal.me.width - size - 1,
+    y = 1.33
+  }, name, 0.5))
+
   return p
 end
 

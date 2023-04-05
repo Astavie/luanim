@@ -1,5 +1,4 @@
-local shapes = require 'shapes'
-local vec2   = require 'vector'.vec2
+local vec2 = vector.vec2
 
 local function test(scene, root)
   local circle = shapes.Circle(vec2(0, -200), 10)

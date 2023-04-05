@@ -1,5 +1,4 @@
-local shapes = require 'shapes'
-local vec2   = require 'vector'.vec2
+local vec2 = vector.vec2
 
 local function binary_tree(angle, scale, it)
   local trunk = shapes.Shape()

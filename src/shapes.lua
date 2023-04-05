@@ -1,13 +1,5 @@
-local signal = require 'signal'
-local luanim = require 'luanim'
-local tweens = require 'tweens'
-local vector = require 'vector'
-local canvas = require 'canvas'
-
 local vec2 = vector.vec2
 local mat3 = vector.mat3
-
-local ir = require 'ir'
 
 local shapes = {}
 local global_id = 0
