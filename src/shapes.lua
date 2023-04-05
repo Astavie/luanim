@@ -512,10 +512,9 @@ function shapes.play(func, cont)
 
     while target_frame > frame do
       -- fast-forward
+      local res = luanim.advance_frame(scene, fps, frame)
 
-      local ok, res = xpcall(luanim.advance_frame, scene.onerr, scene, fps, frame)
-
-      if not ok or (not res and not cont) then
+      if not res and not cont then
         done = true
         frame = target_frame
       else

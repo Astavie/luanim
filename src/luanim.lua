@@ -148,6 +148,22 @@ function luanim.Scene.onerr(...)
   print(debug.traceback(...))
 end
 
+local function printerr(...)
+  print(debug.traceback(...))
+end
+
+local function resume(co, ...)
+  local output = {coroutine.resume(co, ...)}
+  if not output[1] then
+    printerr(co, output[2])
+  end
+  return table.unpack(output)
+end
+
+local function exec(f, ...)
+  xpcall(f, printerr, ...)
+end
+
 ---@param self Scene
 ---@param func fun(scene: Scene, ...: any)
 ---@param ... any
@@ -156,11 +172,9 @@ function luanim.Scene:parallel(func, ...)
   local id = self.nextid
   self.nextid = self.nextid + 1
 
-  self.threads[id] = coroutine.create(function(...)
-    return xpcall(func, self.onerr, ...)
-  end);
+  self.threads[id] = coroutine.create(func);
 
-  local ret = {coroutine.resume(self.threads[id], self, ...)}
+  local ret = {resume(self.threads[id], self, ...)}
   local alive = ret[1]
   local instr = ret[2]
 
@@ -224,11 +238,11 @@ function luanim.advance_frame(scene, fps, prev_frame)
 
       -- calculate animation at end
       if instr.anim ~= nil then
-        instr.anim(1)
+        exec(instr.anim, 1)
       end
 
       -- resume coroutine
-      local ret = {coroutine.resume(scene.threads[id])}
+      local ret = {resume(scene.threads[id])}
       local alive = ret[1]
       instr = ret[2]
 
@@ -247,7 +261,8 @@ function luanim.advance_frame(scene, fps, prev_frame)
     if instr.anim ~= nil then
       local p = (scene.time() - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
-      instr.anim(p)
+
+      exec(instr.anim, p)
     end
 
     ::loop_end::
