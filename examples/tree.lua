@@ -19,7 +19,7 @@ local function binary_tree(angle, scale, it)
 
   local text = shapes.Text(vec2(0, -1), "Harold", 0.005)
   text.angle(math.pi / 2)
-  text.scale(vec2(6))
+  text.scale(vec2(1 / text.width() * 0.9))
   trunk:add_child(text)
 
   local tree = shapes.Shape()
