@@ -490,36 +490,27 @@ end
 ---@param cont? boolean
 function shapes.play(func, cont)
 
-  local fps = canvas.preferred_fps()
-
   local done = false
-  local frame = 0
   local scene = luanim.Scene()
   local root  = shapes.Shape()
   scene:parallel(func, root)
 
   while true do
-    local target_frame, emit = coroutine.yield(done)
+    local time, emit = coroutine.yield(done)
 
-    if target_frame < frame then
+    if time < scene:clock() then
       -- rewind
       done = false
-      frame = 0
       scene = luanim.Scene()
       root = shapes.Shape()
       scene:parallel(func, root)
     end
 
-    while target_frame > frame do
-      -- fast-forward
-      local res = luanim.advance_frame(scene, fps, frame)
+    -- fast-forward
+    local res = luanim.advance_time(scene, time)
 
-      if not res and not cont then
-        done = true
-        frame = target_frame
-      else
-        frame = frame + 1
-      end
+    if not res and not cont then
+      done = true
     end
 
     root:draw_shape(emit)
@@ -536,9 +527,10 @@ function shapes.start(func, cont)
 end
 
 ---@param func fun(scene: Scene, root: Shape)
+---@param fps number
 ---@return string
-function shapes.log(func)
-  return luanim.log(shapes.start(func), ir.MAGIC_SHAPES, canvas.preferred_fps())
+function shapes.log(func, fps)
+  return luanim.log(shapes.start(func), ir.MAGIC_SHAPES, fps)
 end
 
 return shapes

@@ -67,15 +67,7 @@
                 return ctx.measureText(text).width
             }
 
-            const preferred_fps = () => {
-                return frames.value / speedo.value
-            }
-
             thread.lua.lua_createtable(thread.address, 0, 0)
-
-            thread.lua.lua_pushstring(thread.address, "preferred_fps")
-            thread.pushValue(preferred_fps)
-            thread.lua.lua_settable(thread.address, -3)
 
             thread.lua.lua_pushstring(thread.address, "measure")
             thread.pushValue(measure)
@@ -240,7 +232,7 @@
                         lines.push(ctx.getTransform())
 
                         thread.lua.lua_pushvalue(thread.address, -1)
-                        thread.lua.lua_pushnumber(thread.address, frame)
+                        thread.lua.lua_pushnumber(thread.address, frame / (frames.value / speedo.value))
                         thread.lua.lua_pushvalue(thread.address, -4)
 
                         thread.assertOk(thread.lua.lua_pcallk(thread.address, 2, 1, 0, 0, null))

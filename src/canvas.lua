@@ -8,8 +8,4 @@ local canvas = {}
 function canvas.measure(text, font)
 end
 
----@return number
-function canvas.preferred_fps()
-end
-
 return canvas

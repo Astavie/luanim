@@ -212,28 +212,16 @@ setmetatable(luanim.Scene, { __call = function(self, ...) return self.new(...) e
 ---@alias animation fun(p: number)
 ---@alias easing fun(p: number): number
 
----@param instr Instruction
----@param frame_time number
----@return number
-local function end_frame(instr, frame_time)
-  return math.floor((instr.start + instr.duration) / frame_time)
-end
-
 ---@param scene Scene
----@param fps   number
+---@param time number
 ---@return boolean
-function luanim.advance_frame(scene, fps, prev_frame)
-  local frame_time = 1 / fps
-  local time = prev_frame * frame_time
-  local next = (prev_frame + 1) * frame_time
-
-  local hasNext = _G.next(scene.queued) ~= nil
+function luanim.advance_time(scene, time)
+  local has_next = next(scene.queued) ~= nil
 
   for id, instr in pairs(scene.queued) do
-    scene.time(time)
 
     -- resume while finished
-    while end_frame(instr, frame_time) == prev_frame or instr.start + instr.duration == next do
+    while instr.start + instr.duration <= time do
       scene.time(instr.start + instr.duration)
 
       -- calculate animation at end
@@ -256,10 +244,10 @@ function luanim.advance_frame(scene, fps, prev_frame)
     end
 
     -- calculate animation inbetween state
-    scene.time(next)
+    scene.time(time)
 
     if instr.anim ~= nil then
-      local p = (scene.time() - instr.start) / instr.duration
+      local p = (time - instr.start) / instr.duration
       if instr.easing ~= nil then p = instr.easing(p) end
 
       exec(instr.anim, p)
@@ -268,7 +256,7 @@ function luanim.advance_frame(scene, fps, prev_frame)
     ::loop_end::
   end
 
-  scene.time(next)
+  scene.time(time)
 
   -- remove finished coroutines
   for _, id in ipairs(scene.to_remove) do
@@ -280,9 +268,8 @@ function luanim.advance_frame(scene, fps, prev_frame)
   end
   scene.to_remove = {}
 
-  return hasNext
+  return has_next
 end
-
 
 function luanim.log(f, magic, fps)
   local log = ""
@@ -315,7 +302,7 @@ function luanim.log(f, magic, fps)
   local frame = 0
   while true do
     emit(ir.FRAME, frame)
-    if f(frame, emit) then
+    if f(frame / fps, emit) then
       break
     end
     frame = frame + 1
