@@ -67,10 +67,51 @@
                 return ctx.measureText(text).width
             }
 
+            const value = (name, hint, parent) => {
+                const signal = lua.global.get("signal").signal
+
+                // create signal
+                switch (hint) {
+                    case 0:
+                    case 1:
+                        // number
+                        return signal(1)
+                    case 2:
+                        // vec2
+                        const vec2 = lua.global.get("vector").vec2.new
+                        const origin = vec2(0)
+                        return signal(origin)
+                }
+            }
+
+            const signal = (name) => {
+                return null;
+            }
+
             thread.lua.lua_createtable(thread.address, 0, 0)
 
             thread.lua.lua_pushstring(thread.address, "measure")
             thread.pushValue(measure)
+            thread.lua.lua_settable(thread.address, -3)
+
+            thread.lua.lua_pushstring(thread.address, "value")
+            thread.pushValue(value)
+            thread.lua.lua_settable(thread.address, -3)
+
+            thread.lua.lua_pushstring(thread.address, "signal")
+            thread.pushValue(signal)
+            thread.lua.lua_settable(thread.address, -3)
+
+            thread.lua.lua_pushstring(thread.address, "TIME")
+            thread.pushValue(0)
+            thread.lua.lua_settable(thread.address, -3)
+
+            thread.lua.lua_pushstring(thread.address, "SIZE")
+            thread.pushValue(1)
+            thread.lua.lua_settable(thread.address, -3)
+
+            thread.lua.lua_pushstring(thread.address, "VEC2")
+            thread.pushValue(2)
             thread.lua.lua_settable(thread.address, -3)
 
             thread.lua.lua_setglobal(thread.address, "canvas")
