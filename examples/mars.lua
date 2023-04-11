@@ -60,6 +60,20 @@ local function scene1(scene, root)
     y = -130
   }, "Focus: " .. focused ))
 
+  -- time text
+  local year = earth.year:floor()
+  local text = shapes.Shape():add_child(shapes.Text({
+    x = -signal.me.width / 2,
+    y = -110
+  }, "year " .. year))
+
+  root:add_child(text)
+  scene:on_change(year, function()
+    -- print("earth year " .. earth.year())
+    text.pos(vec2(0, -10), 0.1)
+    text.pos(vec2(0,   0), 0.1)
+  end)
+
   -- start advancing time
   scene:advance(time, 1 / 3)
   scene:wait(2)

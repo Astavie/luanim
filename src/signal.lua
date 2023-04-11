@@ -54,7 +54,9 @@ function funcmtbl:__index(key)
   local tables = { vector.mat3, vector.vec2, math }
   for _, v in ipairs(tables) do
     if v[key] ~= nil then
-      return signal.lift(v[key])
+      return signal.lift(function(self, ...)
+        return self[key](self, ...)
+      end)
     end
   end
 

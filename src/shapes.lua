@@ -493,7 +493,7 @@ function shapes.play(func, cont)
   local done = false
   local scene = luanim.Scene()
   local root  = shapes.Shape()
-  scene:parallel(func, root)
+  scene:parallel(func, scene, root)
 
   while true do
     local time, emit = coroutine.yield(done)
@@ -503,7 +503,7 @@ function shapes.play(func, cont)
       done = false
       scene = luanim.Scene()
       root = shapes.Shape()
-      scene:parallel(func, root)
+      scene:parallel(func, scene, root)
     end
 
     -- fast-forward

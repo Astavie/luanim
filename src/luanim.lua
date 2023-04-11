@@ -22,6 +22,35 @@ function luanim.Scene:wait(time)
   coroutine.yield({ start = self.time, duration = time })
 end
 
+---@param predicate fun(): boolean
+function luanim.Scene:wait_until(predicate)
+  while not predicate() do
+    self:wait(0)
+  end
+end
+
+---@param sig fun(): any
+function luanim.Scene:wait_on_change(sig)
+  local now = sig()
+  repeat
+    self:wait(0)
+  until sig() ~= now
+end
+
+---@param sig fun(): any
+---@param f fun(...: any)
+---@param ... any
+---@return id
+function luanim.Scene:on_change(sig, f, ...)
+  local args = {...}
+  return self:parallel(function()
+    while true do
+      self:wait_on_change(sig)
+      self:parallel(f, table.unpack(args))
+    end
+  end)
+end
+
 ---@param self Scene
 ---@param anim animation
 ---@param time? seconds
@@ -57,7 +86,7 @@ end
 
 ---@param self Scene
 ---@param time number
----@param func fun(scene: Scene, ...: any)
+---@param func fun(...: any)
 ---@param ... any
 ---@return id
 function luanim.Scene:interval(time, func, ...)
@@ -165,7 +194,7 @@ local function exec(f, ...)
 end
 
 ---@param self Scene
----@param func fun(scene: Scene, ...: any)
+---@param func fun(...: any)
 ---@param ... any
 ---@return id
 function luanim.Scene:parallel(func, ...)
@@ -174,7 +203,7 @@ function luanim.Scene:parallel(func, ...)
 
   self.threads[id] = coroutine.create(func);
 
-  local ret = {resume(self.threads[id], self, ...)}
+  local ret = {resume(self.threads[id], ...)}
   local alive = ret[1]
   local instr = ret[2]
 
@@ -237,6 +266,12 @@ function luanim.advance_time(scene, time)
       if alive and type(instr) == 'table' then
         instr.start = scene.time()
         scene.queued[id] = instr
+
+        -- a duration of zero means we wait a frame
+        if instr.duration == 0 then
+          instr.start = time
+          break
+        end
       else
         table.insert(scene.to_remove, id)
         goto loop_end
