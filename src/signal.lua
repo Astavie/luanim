@@ -205,7 +205,7 @@ function signal.signal(value, definterp, context, default_mtbl)
 
     -- SET VALUE --
     -- check for compound
-    if type(newval) == 'table' and getmetatable(newval) == nil then
+    if type(newval) == 'table' and getmetatable(newval) == nil and default_mtbl ~= nil then
       local funcs = {}
       local mtbl = getmetatable(out())
       for k, v in pairs(newval) do
