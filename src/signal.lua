@@ -196,7 +196,7 @@ function signal.signal(value, definterp, context, default_mtbl)
         end
         sg.dependencies = {}
 
-        local oldparent   = signal_parent
+        local oldparent = signal_parent
         signal_parent = sg
         sg.cache = sg.value(context)
         signal_parent = oldparent

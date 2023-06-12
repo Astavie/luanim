@@ -14,6 +14,7 @@ local global_id = 0
 ---@field pos   signal<vec2,   Shape>
 ---@field angle signal<number, Shape>
 ---@field scale signal<vec2,   Shape>
+---@field visible signal<boolean, Shape>
 ---@field scale_lines boolean
 ---
 ---@field transform fun(): mat3
@@ -37,6 +38,10 @@ end
 ---@param self Shape
 ---@param emit fun(...)
 function shapes.Shape:draw_shape(emit)
+
+  if not self.visible() then
+	  return
+  end
 
   emit(
     ir.OBJECT,
@@ -134,6 +139,7 @@ function shapes.Shape.new(pos, value, metatable)
   shape.pos   = signal.signal(pos or vec2(0, 0), nil, shape, vec2)
   shape.angle = signal.signal(0, nil, shape, vec2)
   shape.scale = signal.signal(vec2(1, 1), nil, shape, vec2)
+  shape.visible = signal.signal(true, nil, shape, nil)
 
   shape.transform = signal.bind(transform, shape, mat3)
   shape.inverse   = signal.bind(inverse, shape, mat3)
