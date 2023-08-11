@@ -190,6 +190,25 @@
                             ctx.moveTo(lastx, lasty)
                             }
                             break
+                        case 8: // BEZIER
+                            {
+                            const m = fillTrans
+                            const cx1 = num(1)
+                            const cy1 = num(2)
+                            const cx2 = num(3)
+                            const cy2 = num(4)
+                            const x = num(5)
+                            const y = num(6)
+
+                            const tcx1 = m.a * cx1 + m.c * cy1 + m.e
+                            const tcy1 = m.b * cx1 + m.d * cy1 + m.f
+                            const tcx2 = m.a * cx2 + m.c * cy2 + m.e
+                            const tcy2 = m.b * cx2 + m.d * cy2 + m.f
+                            const tx = m.a * x + m.c * y + m.e
+                            const ty = m.b * x + m.d * y + m.f
+                            ctx.bezierCurveTo(tcx1, tcy1, tcx2, tcy2, tx, ty)
+                            }
+                            break
                         case 9: // LINE
                             {
                             const m = fillTrans

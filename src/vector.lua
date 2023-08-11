@@ -121,6 +121,12 @@ end
 
 ---@param self vec2
 ---@return vec2
+function vector.vec2:normalized()
+  return self / self:length()
+end
+
+---@param self vec2
+---@return vec2
 function vector.vec2:log()
   return vector.vec2(math.log(self.x), math.log(self.y))
 end
