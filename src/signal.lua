@@ -1,17 +1,6 @@
 local signal_parent
 
----@class Signal
----@overload fun(value: signalval<number>, definterp?: interp, context?: unknown, default_mtbl?: table): numsignal
----@overload fun(value: signalval<vec2>, definterp?: interp, context?: unknown, default_mtbl?: table): vecsignal
----@overload fun(value: signalval<mat3>, definterp?: interp, context?: unknown, default_mtbl?: table): matsignal
----@overload fun(value: signalval<integer>, definterp?: interp, context?: unknown, default_mtbl?: table): intsignal
----@overload fun(value: signalval<string>, definterp?: interp, context?: unknown, default_mtbl?: table): strsignal
----@overload fun(value: signalval<boolean>, definterp?: interp, context?: unknown, default_mtbl?: table): blnsignal
-local signal = setmetatable({}, {
-  __call = function(self, ...)
-    return self.signal(...)
-  end
-})
+local signal = {}
 
 local optable = {}
 function optable.__add(a, b)    return a + b end
@@ -188,12 +177,60 @@ function signal.lift(func)
   end
 end
 
----@overload fun(value: signalval<number>, definterp?: interp, context?: unknown, default_mtbl?: table): numsignal
----@overload fun(value: signalval<vec2>, definterp?: interp, context?: unknown, default_mtbl?: table): vecsignal
----@overload fun(value: signalval<mat3>, definterp?: interp, context?: unknown, default_mtbl?: table): matsignal
----@overload fun(value: signalval<integer>, definterp?: interp, context?: unknown, default_mtbl?: table): intsignal
----@overload fun(value: signalval<string>, definterp?: interp, context?: unknown, default_mtbl?: table): strsignal
----@overload fun(value: signalval<boolean>, definterp?: interp, context?: unknown, default_mtbl?: table): blnsignal
+---@param value signalval<number>
+---@param definterp? interp<number>
+---@param context? any
+---@return numsignal
+function signal.num(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp, context)
+end
+
+---@param value signalval<vec2>
+---@param definterp? interp<vec2>
+---@param context? any
+---@return vecsignal
+function signal.vec2(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp, context, vector.vec2)
+end
+
+---@param value signalval<mat3>
+---@param definterp? interp<mat3>
+---@param context? any
+---@return matsignal
+function signal.mat3(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp, context, vector.mat3)
+end
+
+---@param value signalval<integer>
+---@param definterp? interp<integer>
+---@param context? any
+---@return intsignal
+function signal.int(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp or tweens.interp.integer, context)
+end
+
+---@param value signalval<string>
+---@param definterp? interp<string>
+---@param context? any
+---@return strsignal
+function signal.str(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp or tweens.interp.none, context)
+end
+
+---@param value signalval<boolean>
+---@param definterp? interp<boolean>
+---@param context? any
+---@return blnsignal
+function signal.bool(value, definterp, context)
+  ---@diagnostic disable-next-line
+  return signal.signal(value, definterp or tweens.interp.none, context)
+end
+
 function signal.signal(value, definterp, context, default_mtbl)
   definterp = definterp or tweens.interp.linear
 
@@ -232,18 +269,12 @@ function signal.signal(value, definterp, context, default_mtbl)
         signal_parent = oldparent
       end
 
-      if default_mtbl == nil and getmetatable(sg.cache) ~= nil then
-        default_mtbl = getmetatable(sg.cache)
-      end
-
       return sg.cache
     end
 
     -- SET VALUE --
     -- check for compound
-    if default_mtbl == nil  and getmetatable(newval) ~= nil then
-      default_mtbl = getmetatable(newval)
-    elseif type(newval) == 'table' and getmetatable(newval) == nil and default_mtbl ~= nil then
+    if type(newval) == 'table' and getmetatable(newval) == nil and default_mtbl ~= nil then
       local funcs = {}
       local mtbl = getmetatable(out())
       for k, v in pairs(newval) do

@@ -32,12 +32,12 @@ end
 
 local function scene1(scene, root)
   -- basic shapes
-  local time = signal(0)
+  local time = signal.num(0)
   local earth = planet(3, "Earth", time, 1)
   local mars = planet(1.5, "Mars", time, 1.52368055, 0.1)
 
   -- camera focus point
-  local focus = signal(vec2(0))
+  local focus = signal.vec2(vec2(0))
   local camang = shapes.Shape()
   local camera = shapes.Shape(-focus)
 
@@ -53,7 +53,7 @@ local function scene1(scene, root)
   root:add_child(camang)
 
   -- focus text
-  local focused = signal("Sun")
+  local focused = signal.str("Sun")
 
   root:add_child(shapes.Text({
     x = -signal.me.width / 2,
@@ -128,7 +128,7 @@ local function scene1(scene, root)
   aumeter.size(aumeter.size())
 
   -- graph
-  local vert = signal(0)
+  local vert = signal.num(0)
   scene:advance(vert, 8)
 
   local graph = shapes.Trace({
@@ -158,7 +158,7 @@ local function scene1(scene, root)
       - 1
   )
 
-  local width = signal(1)
+  local width = signal.num(1)
   root:add_child(shapes.Line({ x = -50 * earth.orbital_radius, y = width * 256 }, vec2(0, 256)))
 
   graph.width(width)

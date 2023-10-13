@@ -57,7 +57,7 @@ function VelocityTrace.new(pos, velocity, width, accuracy)
     velocity = velocity or vec2(0),
   }
 
-  local trace = shapes.Shape(pos, value, VelocityTrace)
+  local trace = shapes.Shape.new(pos, value, VelocityTrace)
   trace.accuracy = accuracy or 1
   trace:reset()
   return trace

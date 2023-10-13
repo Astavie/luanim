@@ -28,6 +28,23 @@ function tweens.easing.none(p)
 end
 
 ---
+---No interpolation
+---
+---@generic T
+---@param a `T`
+---@param b T
+---@param p number
+---@return T
+---@nodiscard
+function tweens.interp.none(a, b, p)
+  if p >= 1 then
+    return b
+  else
+    return a
+  end
+end
+
+---
 ---Base interpolation function
 ---Requires `__mul`, `__add`
 ---

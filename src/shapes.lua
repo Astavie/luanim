@@ -138,10 +138,10 @@ function shapes.Shape.new(pos, value, metatable)
     children = {},
   }
 
-  shape.pos   = signal.signal(pos or vec2(0, 0), nil, shape, vec2)
-  shape.angle = signal.signal(0, nil, shape, vec2)
-  shape.scale = signal.signal(vec2(1, 1), nil, shape, vec2)
-  shape.visible = signal.signal(true, nil, shape, nil)
+  shape.pos     = signal.vec2(pos or vec2(0, 0), nil, shape)
+  shape.angle   = signal.num(0, nil, shape)
+  shape.scale   = signal.vec2(vec2(1, 1), tweens.interp.log, shape)
+  shape.visible = signal.bool(true, nil, shape)
 
   shape.transform = signal.bind(transform, shape, mat3)
   shape.inverse   = signal.bind(inverse, shape, mat3)
@@ -311,8 +311,8 @@ function shapes.PointCloud.new(point, min, max, radius, lineWidth)
 
   local cloud = shapes.Shape.new(nil, value, shapes.PointCloud)
   cloud.point = point
-  cloud.min = signal.signal(min, tweens.interp.integer, cloud)
-  cloud.max = signal.signal(max, tweens.interp.integer, cloud)
+  cloud.min = signal.int(min, nil, cloud)
+  cloud.max = signal.int(max, nil, cloud)
   return cloud
 end
 
@@ -456,7 +456,7 @@ end
 ---@nodiscard
 function shapes.Pointer.new(shape, max)
   local ptr = shapes.Shape.new(nil, nil, shapes.Pointer)
-  ptr.iterations = signal.signal(max or 1, tweens.interp.integer, ptr)
+  ptr.iterations = signal.int(max or 1, nil, ptr)
   ptr.shape = shape
   return ptr
 end
