@@ -7,6 +7,9 @@ local vector = {}
 ---@field d number
 ---@field e number
 ---@field f number
+---@operator mul(mat3): mat3
+---@operator mul(vec2): vec2
+---@overload fun(a: number, b: number, c: number, d: number, e: number, f: number): mat3
 vector.mat3 = {}
 vector.mat3.__index = vector.mat3
 
@@ -47,6 +50,13 @@ vector.mat3.identity = vector.mat3(1, 0, 0, 1, 0, 0)
 ---@class vec2
 ---@field x number
 ---@field y number
+---@operator add(vec2): vec2
+---@operator unm: vec2
+---@operator sub(vec2): vec2
+---@operator mul(number): vec2
+---@operator div(number): vec2
+---@operator idiv(number): vec2
+---@overload fun(x: number, y?: number): vec2
 vector.vec2 = {}
 vector.vec2.__index = vector.vec2
 

@@ -1,4 +1,4 @@
-ir = require 'ir'
+ir     = require 'ir'
 
 tweens = require 'tweens'
 vector = require 'vector'

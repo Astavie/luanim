@@ -1,8 +1,13 @@
 local signal_parent
 
-local signal = {}
-
-setmetatable(signal, {
+---@class Signal
+---@overload fun(value: signalval<number>, definterp?: interp, context?: unknown, default_mtbl?: table): numsignal
+---@overload fun(value: signalval<vec2>, definterp?: interp, context?: unknown, default_mtbl?: table): vecsignal
+---@overload fun(value: signalval<mat3>, definterp?: interp, context?: unknown, default_mtbl?: table): matsignal
+---@overload fun(value: signalval<integer>, definterp?: interp, context?: unknown, default_mtbl?: table): intsignal
+---@overload fun(value: signalval<string>, definterp?: interp, context?: unknown, default_mtbl?: table): strsignal
+---@overload fun(value: signalval<boolean>, definterp?: interp, context?: unknown, default_mtbl?: table): blnsignal
+local signal = setmetatable({}, {
   __call = function(self, ...)
     return self.signal(...)
   end
@@ -86,9 +91,32 @@ setmetatable(funcmtbl, nil)
 
 debug.setmetatable(function()end, funcmtbl)
 
----@alias interp<T>         fun(a: T, b: T, p: number): T
----@alias signalValue<T, C> T | fun(ctx: C): T
----@alias signal<T, C>      fun(value?: signalValue<T, C>, time?: number, easing?: easing, interp?: interp<T>): T
+---@alias interp<T>    fun(a: T, b: T, p: number): T
+---@alias signalval<T> T | fun(ctx: unknown): T
+
+---@class numsignal
+---@overload fun(): number
+---@overload fun(value: number | (fun(ctx: unknown): number), time?: number, easing?: easing, interp?: interp<number>)
+
+---@class vecsignal
+---@overload fun(): vec2
+---@overload fun(value: vec2 | (fun(ctx: unknown): vec2), time?: number, easing?: easing, interp?: interp<vec2>)
+
+---@class matsignal
+---@overload fun(): mat3
+---@overload fun(value: mat3 | (fun(ctx: unknown): mat3), time?: number, easing?: easing, interp?: interp<mat3>)
+
+---@class intsignal
+---@overload fun(): integer
+---@overload fun(value: integer | (fun(ctx: unknown): integer), time?: number, easing?: easing, interp?: interp<integer>)
+
+---@class strsignal
+---@overload fun(): string
+---@overload fun(value: string | (fun(ctx: unknown): string), time?: number, easing?: easing, interp?: interp<string>)
+
+---@class blnsignal
+---@overload fun(): boolean
+---@overload fun(value: boolean | (fun(ctx: unknown): boolean), time?: number, easing?: easing, interp?: interp<boolean>)
 
 local function invalidate(sg)
   for k, _ in pairs(sg.dependents) do
@@ -97,14 +125,17 @@ local function invalidate(sg)
   end
 end
 
-signal.me = {}
-setmetatable(signal.me, signal.me)
-
-function signal.me: __index(key)
-  return function(instance)
-    return instance[key]()
-  end
-end
+---@type signalval<unknown>
+signal.me = setmetatable({}, {
+  __index = function(self, key)
+    return function(ctx)
+      return ctx[key]()
+    end
+  end,
+  __call = function(ctx)
+    return ctx
+  end,
+})
 
 ---@generic T
 ---@param value fun(...): T
@@ -140,7 +171,7 @@ end
 ---@generic T
 ---@generic C
 ---@param func fun(...): T
----@return fun(...: signalValue<any, C>): fun(ctx: C): T
+---@return fun(...: T | (fun(ctx: C): T)): fun(ctx: C): T
 function signal.lift(func)
   return function(...)
     local funcs = {}
@@ -157,13 +188,12 @@ function signal.lift(func)
   end
 end
 
----@generic T
----@generic C
----@param value signalValue<T, C>
----@param definterp? interp<T>
----@param context? C
----@param default_mtbl? table
----@return signal<T, C>
+---@overload fun(value: signalval<number>, definterp?: interp, context?: unknown, default_mtbl?: table): numsignal
+---@overload fun(value: signalval<vec2>, definterp?: interp, context?: unknown, default_mtbl?: table): vecsignal
+---@overload fun(value: signalval<mat3>, definterp?: interp, context?: unknown, default_mtbl?: table): matsignal
+---@overload fun(value: signalval<integer>, definterp?: interp, context?: unknown, default_mtbl?: table): intsignal
+---@overload fun(value: signalval<string>, definterp?: interp, context?: unknown, default_mtbl?: table): strsignal
+---@overload fun(value: signalval<boolean>, definterp?: interp, context?: unknown, default_mtbl?: table): blnsignal
 function signal.signal(value, definterp, context, default_mtbl)
   definterp = definterp or tweens.interp.linear
 
@@ -202,12 +232,18 @@ function signal.signal(value, definterp, context, default_mtbl)
         signal_parent = oldparent
       end
 
+      if default_mtbl == nil and getmetatable(sg.cache) ~= nil then
+        default_mtbl = getmetatable(sg.cache)
+      end
+
       return sg.cache
     end
 
     -- SET VALUE --
     -- check for compound
-    if type(newval) == 'table' and getmetatable(newval) == nil and default_mtbl ~= nil then
+    if default_mtbl == nil  and getmetatable(newval) ~= nil then
+      default_mtbl = getmetatable(newval)
+    elseif type(newval) == 'table' and getmetatable(newval) == nil and default_mtbl ~= nil then
       local funcs = {}
       local mtbl = getmetatable(out())
       for k, v in pairs(newval) do
@@ -258,6 +294,8 @@ function signal.signal(value, definterp, context, default_mtbl)
 
   -- set value
   out(value)
+
+  ---@diagnostic disable-next-line
   return out
 end
 

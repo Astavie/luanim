@@ -9,11 +9,19 @@ debug.setmetatable(0, {
   end
 })
 
+---@class TweenValue
+---@operator mul(self): self
+---@operator add(self): self
+---@field log function(self): self
+---@field exp function(self): self
+---@field floor function(self): self
+
 ---
 ---No easing
 ---
----@param p number
----@return number
+---@generic T
+---@param p `T`
+---@return T
 ---@nodiscard
 function tweens.easing.none(p)
   return p
@@ -24,8 +32,8 @@ end
 ---Requires `__mul`, `__add`
 ---
 ---@generic T
----@param a `T`
----@param b T
+---@param a `T` | TweenValue
+---@param b T | TweenValue
 ---@param p number
 ---@return T
 function tweens.interp.linear(a, b, p)
@@ -38,8 +46,8 @@ end
 ---Requires `__mul`, `__add` and `floor`
 ---
 ---@generic T
----@param a `T`
----@param b T
+---@param a `T` | TweenValue
+---@param b T | TweenValue
 ---@param p number
 ---@return T
 function tweens.interp.integer(a, b, p)
@@ -52,8 +60,8 @@ end
 ---Requires `__mul`, `__add`, `log`, `exp`
 ---
 ---@generic T
----@param a `T`
----@param b T
+---@param a `T` | TweenValue
+---@param b T | TweenValue
 ---@param p number
 ---@return T
 function tweens.interp.log(a, b, p)
@@ -69,8 +77,8 @@ end
 ---Requires `__mul`, `__add`, `log`, `exp`, `floor`
 ---
 ---@generic T
----@param a `T`
----@param b T
+---@param a `T` | TweenValue
+---@param b T | TweenValue
 ---@param p number
 ---@return T
 function tweens.interp.log_integer(a, b, p)

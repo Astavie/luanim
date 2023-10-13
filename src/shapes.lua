@@ -11,10 +11,10 @@ local global_id = 0
 ---@field package children table<id, Shape>
 ---@field package parent? Shape
 ---
----@field pos   signal<vec2,   Shape>
----@field angle signal<number, Shape>
----@field scale signal<vec2,   Shape>
----@field visible signal<boolean, Shape>
+---@field pos         vecsignal
+---@field angle       numsignal
+---@field scale       vecsignal
+---@field visible     blnsignal
 ---@field scale_lines boolean
 ---
 ---@field transform fun(): mat3
@@ -25,6 +25,8 @@ local global_id = 0
 ---@field root_pos       fun(): vec2
 ---
 ---@field protected draw? fun(self, emit: fun(...)))
+---
+---@overload fun(pos: signalval<vec2>): Shape
 shapes.Shape = {}
 shapes.Shape.__index = shapes.Shape
 
@@ -122,8 +124,8 @@ local function root_pos(shape)
   return vec
 end
 
----@param pos?       signalValue<vec2, Shape>
----@param value?     table<any, signalValue<any, Shape>>
+---@param pos?       signalval<vec2>
+---@param value?     table<any, signalval<unknown>>
 ---@param metatable? table
 ---@return any
 ---@nodiscard
@@ -207,7 +209,8 @@ end
 --- CIRCLE ---
 
 ---@class Circle : Shape
----@field radius signal<number>
+---@field radius numsignal
+---@overload fun(pos?: signalval<vec2>, radius?: signalval<number>): Circle
 shapes.Circle = shapes.newshape()
 
 ---@param self Circle
@@ -216,18 +219,20 @@ function shapes.Circle:draw(emit)
   emit(ir.CIRCLE, 0, 0, self.radius())
 end
 
----@param pos?   signalValue<vec2,   Circle>
----@param radius signalValue<number, Circle>
+---@param pos?    signalval<vec2>
+---@param radius? signalval<number>
 ---@return Circle
 ---@nodiscard
 function shapes.Circle.new(pos, radius)
-  return shapes.Shape(pos, { radius = radius }, shapes.Circle)
+  radius = radius or 1
+  return shapes.Shape.new(pos, { radius = radius }, shapes.Circle)
 end
 
 --- POINT (circle that doesn't scale) ---
 
 ---@class Point : Shape
----@field radius signal<number>
+---@field radius numsignal
+---@overload fun(pos?: signalval<vec2>, radius?: signalval<number>): Point
 shapes.Point = shapes.newshape()
 
 ---@param self Point
@@ -236,25 +241,26 @@ function shapes.Point:draw(emit)
   emit(ir.POINT, 0, 0, self.radius())
 end
 
----@param pos     signalValue<vec2,   Circle>
----@param radius? signalValue<number, Circle>
+---@param pos?    signalval<vec2>
+---@param radius? signalval<number>
 ---@return Point
 ---@nodiscard
 function shapes.Point.new(pos, radius)
   radius = radius or 1
-  return shapes.Shape(pos, { radius = radius }, shapes.Point)
+  return shapes.Shape.new(pos, { radius = radius }, shapes.Point)
 end
 
 --- POINT CLOUD ---
 
 ---@class PointCloud : Shape
----@field radius    signal<number>
----@field min       signal<integer>
----@field max       signal<integer>
----@field lineMin   signal<number>
----@field lineMax   signal<number>
----@field lineWidth signal<number>
+---@field radius    numsignal
+---@field min       intsignal
+---@field max       intsignal
+---@field lineMin   numsignal
+---@field lineMax   numsignal
+---@field lineWidth numsignal
 ---@field point fun(n: integer): number, number
+---@overload fun(point: (fun(n: integer): number, number), min: signalval<integer>, max: signalval<integer>, radius?: signalval<number>, lineWidth?: signalval<number>): PointCloud
 shapes.PointCloud = shapes.newshape()
 
 ---@param self PointCloud
@@ -288,10 +294,10 @@ function shapes.PointCloud:draw(emit)
 end
 
 ---@param point fun(n: integer): number, number
----@param min        signalValue<integer, PointCloud>
----@param max        signalValue<integer, PointCloud>
----@param radius?    signalValue<number,  PointCloud>
----@param lineWidth? signalValue<number,  PointCloud>
+---@param min        signalval<integer>
+---@param max        signalval<integer>
+---@param radius?    signalval<number>
+---@param lineWidth? signalval<number>
 ---@return PointCloud
 ---@nodiscard
 function shapes.PointCloud.new(point, min, max, radius, lineWidth)
@@ -303,7 +309,7 @@ function shapes.PointCloud.new(point, min, max, radius, lineWidth)
     lineWidth = lineWidth or 1,
   }
 
-  local cloud = shapes.Shape(nil, value, shapes.PointCloud)
+  local cloud = shapes.Shape.new(nil, value, shapes.PointCloud)
   cloud.point = point
   cloud.min = signal.signal(min, tweens.interp.integer, cloud)
   cloud.max = signal.signal(max, tweens.interp.integer, cloud)
@@ -313,10 +319,11 @@ end
 --- TRACE ---
 
 ---@class Trace : Shape
----@field width    signal<number>
+---@field width    numsignal
 ---@field accuracy number
 ---
 ---@field package list vec2[]
+---@overload fun(pos?: signalval<vec2>, width?: signalval<number>, accuracy?: number): Trace
 shapes.Trace = shapes.newshape()
 
 ---@param self Trace
@@ -353,8 +360,8 @@ function shapes.Trace:draw(emit)
   emit(ir.PATH_END)
 end
 
----@param pos?      signalValue<vec2, Trace>
----@param width?    signalValue<number, Trace>
+---@param pos?      signalval<vec2>
+---@param width?    signalval<number>
 ---@param accuracy? number
 ---@return Trace
 ---@nodiscard
@@ -364,7 +371,7 @@ function shapes.Trace.new(pos, width, accuracy)
     width = width or 1,
   }
 
-  local trace = shapes.Shape(pos, value, shapes.Trace)
+  local trace = shapes.Shape.new(pos, value, shapes.Trace)
   trace.accuracy = accuracy or 1
   trace:reset()
   return trace
@@ -373,8 +380,9 @@ end
 --- LINE ---
 
 ---@class Line : Shape
----@field vec   signal<vec2>
----@field width signal<number>
+---@field vec   vecsignal
+---@field width numsignal
+---@overload fun(v1?: signalval<vec2>, v2?: signalval<vec2>, width?: signalval<number>): Line
 shapes.Line = shapes.newshape()
 
 ---@param self Line
@@ -386,9 +394,9 @@ function shapes.Line:draw(emit)
   emit(ir.PATH_END)
 end
 
----@param v1?    signalValue<vec2,   Line>
----@param v2?    signalValue<vec2,   Line>
----@param width? signalValue<number, Line>
+---@param v1?    signalval<vec2>
+---@param v2?    signalval<vec2>
+---@param width? signalval<number>
 ---@return Line
 ---@nodiscard
 function shapes.Line.new(v1, v2, width)
@@ -398,13 +406,14 @@ function shapes.Line.new(v1, v2, width)
     width = width or 1,
   }
 
-  return shapes.Shape(v1, value, shapes.Line)
+  return shapes.Shape.new(v1, value, shapes.Line)
 end
 
 --- RECTANGLE ---
 
 ---@class Rect : Shape
----@field size signal<vec2>
+---@field size vecsignal
+---@overload fun(pos?: signalval<vec2>, size?: signalval<vec2>): Trace
 shapes.Rect = shapes.newshape()
 
 ---@param self Rect
@@ -413,21 +422,22 @@ function shapes.Rect:draw(emit)
   emit(ir.RECT, 0, 0, self.size():unpack())
 end
 
----@param pos?  signalValue<vec2, Rect>
----@param size? signalValue<vec2, Rect>
+---@param pos?  signalval<vec2>
+---@param size? signalval<vec2>
 ---@return Rect
 ---@nodiscard
 function shapes.Rect.new(pos, size)
-  return shapes.Shape(pos, { size = size or vec2(0) }, shapes.Rect)
+  return shapes.Shape.new(pos, { size = size or vec2(0) }, shapes.Rect)
 end
 
 --- POINTER ---
 
 local _iteration = 0
 
----@class Pointer
+---@class Pointer : Shape
 ---@field shape Shape
----@field iterations signal<integer>
+---@field iterations intsignal
+---@overload fun(shape: Shape, max?: signalval<integer>): Pointer
 shapes.Pointer = shapes.newshape()
 
 ---@param self Pointer
@@ -441,11 +451,11 @@ function shapes.Pointer:draw(emit)
 end
 
 ---@param shape Shape
----@param max? signalValue<integer, Pointer>
+---@param max? signalval<integer>
 ---@return Pointer
 ---@nodiscard
 function shapes.Pointer.new(shape, max)
-  local ptr = shapes.Shape(nil, nil, shapes.Pointer)
+  local ptr = shapes.Shape.new(nil, nil, shapes.Pointer)
   ptr.iterations = signal.signal(max or 1, tweens.interp.integer, ptr)
   ptr.shape = shape
   return ptr
@@ -453,10 +463,11 @@ end
 
 --- TEXT ---
 
----@class Text
----@field text signal<string>
----@field size signal<number>
+---@class Text : Shape
+---@field text strsignal
+---@field size numsignal
 ---@field width fun(): number
+---@overload fun(pos?: signalval<vec2>, text: signalval<string>, size?: signalval<number>): Text
 shapes.Text = shapes.newshape()
 
 ---@param self Text
@@ -465,13 +476,13 @@ function shapes.Text:draw(emit)
   emit(ir.TEXT, 0, 0, self.size(), self.text())
 end
 
----@param pos   signalValue<vec2, Text>
----@param text  signalValue<string, Text>
----@param size? signalValue<number, Text>
+---@param pos?  signalval<vec2>
+---@param text  signalval<string>
+---@param size? signalval<number>
 ---@return Text
 ---@nodiscard
 function shapes.Text.new(pos, text, size)
-  local txt = shapes.Shape(pos, {
+  local txt = shapes.Shape.new(pos, {
     text = text,
     size = size or 1,
   }, shapes.Text)
