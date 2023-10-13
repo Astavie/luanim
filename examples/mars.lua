@@ -1,23 +1,29 @@
 local vec2 = vector.vec2
 
+local SCALE = 50
+
 local function planet(size, name, time, r, offset)
   offset = offset or 0
   local rt = math.sqrt(r)
   local period = rt * rt * rt
   if period == 0 then period = 1 end
 
-  local p = shapes.Circle({
-    x = 50 * r * (signal.me.year * 2 * math.pi):cos(),
-    y = 50 * r * (signal.me.year * 2 * math.pi):sin()
-  }, size)
+  local year = signal.num(function()
+    return time() / period - offset
+  end)
 
-  p.year = time / period - offset
+  local function position()
+    return vec2(
+      r * math.cos(year() * 2 * math.pi),
+      r * math.sin(year() * 2 * math.pi)
+    )
+  end
+
+  local p = shapes.Circle(position, size / SCALE)
+  p.year = year
   p.orbital_radius = r
 
-  p:add_child(shapes.Text({
-    x = -signal.me.width - size - 1,
-    y = 1.33
-  }, name, 0.5))
+  p:add_child(shapes.Text(vec2((size + 1) / SCALE, 1.33 / SCALE), name, 0.5))
 
   return p
 end
@@ -39,9 +45,10 @@ local function scene1(scene, root)
   -- camera focus point
   local focus = signal.vec2(vec2(0))
   local camang = shapes.Shape()
-  local camera = shapes.Shape(-focus)
+  local camera = shapes.Shape(focus:negate())
+  camang.scale(vec2(SCALE))
 
-  local cloud = stars(vec2(512), 1000, 0.2)
+  local cloud = stars(vec2(512 / SCALE), 1000, 0.3)
   cloud.pos(focus)
   camera:add_child(cloud)
 
@@ -56,16 +63,16 @@ local function scene1(scene, root)
   local focused = signal.str("Sun")
 
   root:add_child(shapes.Text({
-    x = -signal.me.width / 2,
+    x = shapes.Text.center,
     y = -130
-  }, "Focus: " .. focused ))
+  }, function() return "Focus: " .. focused() end))
 
   -- time text
-  local year = earth.year:floor()
+  local year = function() return math.floor(earth.year()) end
   local text = shapes.Shape():add_child(shapes.Text({
-    x = -signal.me.width / 2,
+    x = shapes.Text.center,
     y = -110
-  }, "year " .. year))
+  }, function() return "year " .. year() end))
 
   root:add_child(text)
   scene:on_change(year, function()
@@ -99,7 +106,7 @@ local function scene1(scene, root)
   )
 
   -- change focus to earth
-  focus(vec2(50, 0), 1)
+  focus(vec2(1, 0), 1)
   focus(earth.pos)
   focused("Earth")
 
@@ -111,30 +118,32 @@ local function scene1(scene, root)
 
   -- add line to mars
   local line = shapes.Line()
+  line.scale(vec2(SCALE))
   root:add_child(line)
 
   local aumeter = shapes.Text(
-    vec2(2, -2),
-    line.vec:length() / 50 .. " au",
+    vec2(2 / SCALE, -2 / SCALE),
+    function() return line.vec():length() .. " au" end,
     0
   )
   scene:advance(aumeter.size, 0.5)
   line:add_child(aumeter)
 
+  local earth_to_mars = signal.vec2(earth:lifted_vector_to(mars))
   line.vec({
-    x = (earth.pos - mars.pos):length(),
+    x = earth_to_mars:map(vec2.length),
     y = 0
   }, 1)
   aumeter.size(aumeter.size())
 
   -- graph
   local vert = signal.num(0)
-  scene:advance(vert, 8)
+  scene:advance(vert, 8 / SCALE)
 
   local graph = shapes.Trace({
     x = line.vec.x,
-    y = -vert
-  })
+    y = vert:negate()
+  }, nil, 1 / SCALE)
   local handle = shapes.Shape({
     x = 0,
     y = vert
@@ -143,7 +152,7 @@ local function scene1(scene, root)
   line:add_child(handle)
 
   -- put line to the side
-  line:add_child(shapes.Circle(line.vec, 1.5))
+  line:add_child(shapes.Circle(line.vec, 1.5 / SCALE))
   line.pos(vec2(120, -120), 0.5)
 
   -- trace mars again
@@ -159,7 +168,7 @@ local function scene1(scene, root)
   )
 
   local width = signal.num(1)
-  root:add_child(shapes.Line({ x = -50 * earth.orbital_radius, y = width * 256 }, vec2(0, 256)))
+  root:add_child(shapes.Line({ x = -earth.orbital_radius * SCALE, y = width:scale(256) }, vec2(0, 256)))
 
   graph.width(width)
   trace.width(width)
@@ -170,7 +179,7 @@ local function scene1(scene, root)
   -- focus
   focus(earth.pos)
   focused("Earth-Sun")
-  camang.angle(-earth.year * 2 * math.pi)
+  camang.angle(earth.year:scale(-2 * math.pi))
   scene:wait(1)
 
   -- trace mars again

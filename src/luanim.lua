@@ -8,7 +8,7 @@ local luanim = {}
 
 ---@class Scene
 ---@field clock fun(): seconds
----@field package time      signal<seconds, nil>
+---@field package time      numsignal
 ---@field package threads   table<id, thread>
 ---@field package queued    table<id, Instruction>
 ---@field package to_remove id[]
@@ -62,7 +62,7 @@ end
 
 ---@generic T
 ---@generic C
----@param sg signal<T, C>
+---@param sg fun(v?: fun(C): T): T
 ---@param func T | fun(prev: T, delta: number, ctx: C): T
 function luanim.Scene:advance(sg, func)
 
@@ -222,14 +222,14 @@ end
 function luanim.Scene.new()
   ---@type Scene
   local scene = {
-    time = signal.signal(0),
+    time = signal.num(0),
     refs = {},
     threads = {},
     queued = {},
     to_remove = {},
     nextid = 0,
   }
-  scene.clock = signal.bind(scene.time)
+  scene.clock = function() return scene.time() end
 
   setmetatable(scene, luanim.Scene)
   return scene

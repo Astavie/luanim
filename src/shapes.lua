@@ -125,11 +125,10 @@ local function root_pos(shape)
 end
 
 ---@param pos?       signalval<vec2>
----@param value?     table<any, signalval<unknown>>
 ---@param metatable? table
 ---@return any
 ---@nodiscard
-function shapes.Shape.new(pos, value, metatable)
+function shapes.Shape.new(pos, metatable)
   metatable = metatable or shapes.Shape
 
   local shape = {
@@ -143,16 +142,12 @@ function shapes.Shape.new(pos, value, metatable)
   shape.scale   = signal.vec2(vec2(1, 1), tweens.interp.log, shape)
   shape.visible = signal.bool(true, nil, shape)
 
-  shape.transform = signal.bind(transform, shape, mat3)
-  shape.inverse   = signal.bind(inverse, shape, mat3)
+  shape.transform = function() return transform(shape) end
+  shape.inverse   = function() return inverse(shape) end
 
-  shape.root_transform = signal.bind(root_transform, shape, mat3)
-  shape.root_inverse   = signal.bind(root_inverse, shape, mat3)
-  shape.root_pos       = signal.bind(root_pos, shape, vec2)
-
-  for k, v in pairs(value or {}) do
-    shape[k] = signal.signal(v, nil, shape, vec2)
-  end
+  shape.root_transform = function() return root_transform(shape) end
+  shape.root_inverse   = function() return root_inverse(shape) end
+  shape.root_pos       = function() return root_pos(shape) end
 
   setmetatable(shape, metatable)
   return shape
@@ -169,7 +164,9 @@ end
 ---@param shape Shape
 ---@return fun(): vec2
 function shapes.Shape:lifted_vector_to(shape)
-  return self.root_inverse * shape.root_pos
+  return function()
+    return self.root_inverse() * shape.root_pos()
+  end
 end
 
 setmetatable(shapes.Shape, { __call = function(self, ...) return self.new(...) end })
@@ -224,8 +221,9 @@ end
 ---@return Circle
 ---@nodiscard
 function shapes.Circle.new(pos, radius)
-  radius = radius or 1
-  return shapes.Shape.new(pos, { radius = radius }, shapes.Circle)
+  local circle = shapes.Shape.new(pos, shapes.Circle)
+  circle.radius = signal.num(radius or 1, nil, circle)
+  return circle
 end
 
 --- POINT (circle that doesn't scale) ---
@@ -246,8 +244,9 @@ end
 ---@return Point
 ---@nodiscard
 function shapes.Point.new(pos, radius)
-  radius = radius or 1
-  return shapes.Shape.new(pos, { radius = radius }, shapes.Point)
+  local point = shapes.Shape.new(pos, shapes.Point)
+  point.radius = signal.num(radius or 0, nil, point)
+  return point
 end
 
 --- POINT CLOUD ---
@@ -301,16 +300,12 @@ end
 ---@return PointCloud
 ---@nodiscard
 function shapes.PointCloud.new(point, min, max, radius, lineWidth)
-
-  local value = {
-    radius = radius or 1,
-    lineMin = min,
-    lineMax = min,
-    lineWidth = lineWidth or 1,
-  }
-
-  local cloud = shapes.Shape.new(nil, value, shapes.PointCloud)
+  local cloud = shapes.Shape.new(nil, shapes.PointCloud)
   cloud.point = point
+  cloud.radius = signal.num(radius or 1, nil, cloud)
+  cloud.lineMin = signal.num(min, nil, cloud)
+  cloud.lineMax = signal.num(min, nil, cloud)
+  cloud.lineWidth = signal.num(lineWidth or 1, nil, cloud)
   cloud.min = signal.int(min, nil, cloud)
   cloud.max = signal.int(max, nil, cloud)
   return cloud
@@ -366,12 +361,8 @@ end
 ---@return Trace
 ---@nodiscard
 function shapes.Trace.new(pos, width, accuracy)
-
-  local value = {
-    width = width or 1,
-  }
-
-  local trace = shapes.Shape.new(pos, value, shapes.Trace)
+  local trace = shapes.Shape.new(pos, shapes.Trace)
+  trace.width = signal.num(width or 1, nil, trace)
   trace.accuracy = accuracy or 1
   trace:reset()
   return trace
@@ -400,13 +391,10 @@ end
 ---@return Line
 ---@nodiscard
 function shapes.Line.new(v1, v2, width)
-
-  local value = {
-    vec = v2 or vec2(0),
-    width = width or 1,
-  }
-
-  return shapes.Shape.new(v1, value, shapes.Line)
+  local line = shapes.Shape.new(v1, shapes.Line)
+  line.vec = signal.vec2(v2 or vec2(0), nil, line)
+  line.width = signal.num(width or 1, nil, line)
+  return line
 end
 
 --- RECTANGLE ---
@@ -427,7 +415,9 @@ end
 ---@return Rect
 ---@nodiscard
 function shapes.Rect.new(pos, size)
-  return shapes.Shape.new(pos, { size = size or vec2(0) }, shapes.Rect)
+  local rect = shapes.Shape.new(pos, shapes.Rect)
+  rect.size = signal.vec2(size or vec2(0), nil, rect)
+  return rect
 end
 
 --- POINTER ---
@@ -455,7 +445,7 @@ end
 ---@return Pointer
 ---@nodiscard
 function shapes.Pointer.new(shape, max)
-  local ptr = shapes.Shape.new(nil, nil, shapes.Pointer)
+  local ptr = shapes.Shape.new(nil, shapes.Pointer)
   ptr.iterations = signal.int(max or 1, nil, ptr)
   ptr.shape = shape
   return ptr
@@ -476,20 +466,24 @@ function shapes.Text:draw(emit)
   emit(ir.TEXT, 0, 0, self.size(), self.text())
 end
 
+shapes.Text.center = function(txt)
+  return -txt.width() / 2
+end
+
 ---@param pos?  signalval<vec2>
 ---@param text  signalval<string>
 ---@param size? signalval<number>
 ---@return Text
 ---@nodiscard
 function shapes.Text.new(pos, text, size)
-  local txt = shapes.Shape.new(pos, {
-    text = text,
-    size = size or 1,
-  }, shapes.Text)
+  local txt = shapes.Shape.new(pos, shapes.Text)
 
-  txt.width = signal.bind(function (self)
-    return canvas.measure(self.text()) * self.size()
-  end, txt)
+  txt.text = signal.str(text, nil, txt)
+  txt.size = signal.num(size or 1, nil, txt)
+
+  txt.width = function()
+    return canvas.measure(txt.text()) * txt.size()
+  end
 
   return txt
 end

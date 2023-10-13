@@ -2,9 +2,13 @@ local vec2 = vector.vec2
 
 local function binary_tree(angle, scale, it)
   local trunk = shapes.Shape()
+  trunk.scale_lines = true
 
   local left  = shapes.Pointer(trunk, it)
+  left.scale_lines = true
+
   local right = shapes.Pointer(trunk, it)
+  right.scale_lines = true
 
   left.pos  (vec2(0, -1))
   left.angle(-angle.x)
@@ -18,11 +22,13 @@ local function binary_tree(angle, scale, it)
   trunk:add_child(right)
 
   local text = shapes.Text(vec2(0, -1), "Harold", 0.005)
+  text.scale_lines = true
   text.angle(math.pi / 2)
   text.scale(vec2(1 / text.width() * 0.9))
   trunk:add_child(text)
 
   local tree = shapes.Shape()
+  tree.scale_lines = true
   tree:add_child(trunk)
   return tree, trunk, left, right, text
 end
@@ -34,6 +40,7 @@ local function tree_anim(scene, root)
   local tree, trunk, left, right, text = binary_tree(angle, scale, 8)
   tree.pos  (vec2(0, 140))
   tree.scale(vec2(70))
+
   trunk.scale(vec2(0))
 
   root:add_child(tree)

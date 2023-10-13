@@ -230,10 +230,15 @@
                             ctx.fill()
                             break
                         case 13: // TEXT
-                            switchFill()
+                            switchLine()
+                            const m = fillTrans
+                            const x = num(1)
+                            const y = num(2)
+                            const scale = num(3)
+
                             ctx.save()
-                            ctx.scale(num(3), num(3))
-                            ctx.fillText(str(4), num(1), num(2))
+                            ctx.scale(scale, scale)
+                            ctx.fillText(str(4), (m.a * x + m.c * y + m.e) / scale, (m.b * x + m.d * y + m.f) / scale)
                             ctx.restore()
                             break
                         case 4: // POINT

@@ -7686,7 +7686,7 @@ local function plot(scene, root)
   root:add_child(cloud)
 
   -- zoom out
-  root.scale(vec2(0.012 * scale), 5, nil, tweens.interp.log)
+  root.scale(vec2(0.012 * scale), 5)
 
   -- make points smaller
   cloud.radius(0.5, 1)
@@ -7696,7 +7696,7 @@ local function plot(scene, root)
 
   -- zoom out even more
   cloud.max(25000)
-  root.scale(vec2(0.0012 * scale), 2, nil, tweens.interp.log)
+  root.scale(vec2(0.0012 * scale), 2)
 end
 
 return shapes.start(plot)
